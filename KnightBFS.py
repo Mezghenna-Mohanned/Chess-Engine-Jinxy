@@ -68,12 +68,18 @@ def knight_turn(knight_position, king_position):
         return new_knight_position
     return knight_position
 
-def king_turn(knight_position):
-    """Player's turn to move the king."""
-    king_position = input(f"Your turn! Enter new King position (e.g., 'e4') avoiding knight at {knight_position}: ").lower()
-    while not is_valid_position(king_position) or king_position == knight_position:
-        king_position = input("Invalid or blocked position! Enter a valid position: ").lower()
-    return king_position
+def king_turn(knight_position, current_king_position):
+    """Player's turn to move the king. The king cannot stay in the same position."""
+    new_king_position = input(f"Your turn! Enter new King position (e.g., 'e4') avoiding knight at {knight_position}: ").lower()
+
+    while not is_valid_position(new_king_position) or new_king_position == current_king_position or new_king_position == knight_position:
+        new_king_position = input("Invalid or blocked position! Enter a valid new position: ").lower()
+
+    return new_king_position
+
+def is_king_in_check(knight_position, king_position):
+    """Check if the king is in check (knight can reach king next move)."""
+    return king_position in get_valid_knight_moves(knight_position)
 
 def game_loop():
     """Main game loop where knight and king take turns."""
@@ -83,13 +89,17 @@ def game_loop():
     print(f"Game start! Knight starts at {knight_position}, King starts at {king_position}")
 
     while knight_position != king_position:
+
         knight_position = knight_turn(knight_position, king_position)
 
         if knight_position == king_position:
             print(f"Knight caught the King at {knight_position}! Game over.")
             break
 
-        king_position = king_turn(knight_position)
+        if is_king_in_check(knight_position, king_position):
+            print(f"Check! The knight is threatening the King at {king_position}!")
+
+        king_position = king_turn(knight_position, king_position)
 
         print(f"King moved to: {king_position}")
 
