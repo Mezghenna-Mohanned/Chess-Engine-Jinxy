@@ -1,47 +1,30 @@
+import random
 from collections import deque
 
 columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 rows = [8, 7, 6, 5, 4, 3, 2, 1]
-
 chessboard = [[f"{col}{row}" for col in columns] for row in rows]
 
-
-for row in chessboard:
-    print(row)
-
+knight_moves = [
+    (2, 1), (2, -1), (-2, 1), (-2, -1),
+    (1, 2), (1, -2), (-1, 2), (-1, -2)
+]
 
 def is_valid_position(position):
+    """Check if the entered position is valid."""
     if len(position) == 2:
         col, row = position[0], position[1]
         return col in columns and row in '12345678'
     return False
 
-
-king_position = input("Enter the position of the King (e.g., 'e4'): ").lower()
-while not is_valid_position(king_position):
-    king_position = input("Invalid position! Enter the position of the King (e.g., 'e4'): ").lower()
-
-knight_position = input("Enter the position of the Knight (e.g., 'g2'): ").lower()
-while not is_valid_position(knight_position):
-    knight_position = input("Invalid position! Enter the position of the Knight (e.g., 'g2'): ").lower()
-
-print(f"King's position: {king_position}")
-print(f"Knight's position: {knight_position}")
-
-
-knight_moves = [
-    (2, 1),   # (x + 2, y + 1)
-    (2, -1),  # (x + 2, y - 1)
-    (-2, 1),  # (x - 2, y + 1)
-    (-2, -1), # (x - 2, y - 1)
-    (1, 2),   # (x + 1, y + 2)
-    (1, -2),  # (x + 1, y - 2)
-    (-1, 2),  # (x - 1, y + 2)
-    (-1, -2)  # (x - 1, y - 2)
-]
-
+def random_position():
+    """Get a random valid position on the chessboard."""
+    col = random.choice(columns)
+    row = random.choice('12345678')
+    return f"{col}{row}"
 
 def get_valid_knight_moves(knight_position):
+    """Get all valid knight moves from a given position."""
     valid_moves = []
     col_index = columns.index(knight_position[0])
     row_index = int(knight_position[1]) - 1
@@ -56,34 +39,62 @@ def get_valid_knight_moves(knight_position):
 
     return valid_moves
 
-
 def bfs_knight_to_king(knight_position, king_position):
+    """Use BFS to get the shortest path from the knight to the king."""
     queue = deque([(knight_position, [knight_position])])
     visited = set()
 
     while queue:
         current_position, path = queue.popleft()
 
-        print(f"Visiting: {current_position}, Path so far: {path}")
-
         if current_position == king_position:
-            print(f"Reached the king at: {current_position}")
             return path
 
         visited.add(current_position)
-        print(f"Visited positions: {visited}")
 
         for move in get_valid_knight_moves(current_position):
             if move not in visited:
-                print(f"Adding move: {move} to the queue")
                 queue.append((move, path + [move]))
 
-        print(f"Queue state: {list(queue)}")
-
     return None
-shortest_path = bfs_knight_to_king(knight_position, king_position)
 
-if shortest_path:
-    print(f"Shortest path for the knight to reach the king: {shortest_path}")
-else:
-    print("No path found for the knight to reach the king.")
+def knight_turn(knight_position, king_position):
+    """Program's turn to move the knight towards the king."""
+    print(f"Knight's current position: {knight_position}")
+    path = bfs_knight_to_king(knight_position, king_position)
+    if path and len(path) > 1:
+        new_knight_position = path[1]
+        print(f"Knight moves to: {new_knight_position}")
+        return new_knight_position
+    return knight_position
+
+def king_turn(knight_position):
+    """Player's turn to move the king."""
+    king_position = input(f"Your turn! Enter new King position (e.g., 'e4') avoiding knight at {knight_position}: ").lower()
+    while not is_valid_position(king_position) or king_position == knight_position:
+        king_position = input("Invalid or blocked position! Enter a valid position: ").lower()
+    return king_position
+
+def game_loop():
+    """Main game loop where knight and king take turns."""
+    knight_position = random_position()
+    king_position = random_position()
+
+    print(f"Game start! Knight starts at {knight_position}, King starts at {king_position}")
+
+    while knight_position != king_position:
+        knight_position = knight_turn(knight_position, king_position)
+
+        if knight_position == king_position:
+            print(f"Knight caught the King at {knight_position}! Game over.")
+            break
+
+        king_position = king_turn(knight_position)
+
+        print(f"King moved to: {king_position}")
+
+    if knight_position == king_position:
+        print("The knight captured the king! Game over.")
+
+if __name__ == "__main__":
+    game_loop()
