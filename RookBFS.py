@@ -73,17 +73,19 @@ def get_valid_king_moves(king_position, rook_position):
 def rook_turn(rook_position, king_position):
     valid_moves = get_valid_rook_moves(rook_position)
 
-    # Check if we can move to a position that puts the King in check
-    check_moves = [move for move in valid_moves if move[0] == king_position[0] or move[1] == king_position[1]]
+    # Check for safe moves that also put the King in check
+    safe_moves = [
+        move for move in valid_moves 
+        if (move[0] == king_position[0] or move[1] == king_position[1]) 
+        and move not in get_valid_king_moves(king_position, rook_position)
+    ]
 
-    if check_moves:
-        # Move to the furthest valid check move
-        furthest_check_move = max(check_moves, key=lambda m: (columns.index(m[0]) - columns.index(rook_position[0])) ** 2 +
-                                                    (rows.index(m[1]) - rows.index(rook_position[1])) ** 2)
-        print(f"Rook moves to: {furthest_check_move} and puts King in check!")
-        return furthest_check_move
-
-    # If no check moves, move normally towards the King
+    if safe_moves:
+        for move in safe_moves:
+            if move not in get_valid_king_moves(king_position, rook_position):
+                print(f"Rook moves to: {move} and puts King in check!")
+                return move
+    
     path = bfs_rook_to_king(rook_position, king_position)
     if path and len(path) > 1:
         new_rook_position = path[1]
