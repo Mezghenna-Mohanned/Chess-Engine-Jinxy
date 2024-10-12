@@ -1,13 +1,21 @@
 import random
 from collections import deque
 
+
 columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 rows = [8, 7, 6, 5, 4, 3, 2, 1]
 chessboard = [[f"{col}{row}" for col in columns] for row in rows]
 
+
 knight_moves = [
     (2, 1), (2, -1), (-2, 1), (-2, -1),
     (1, 2), (1, -2), (-1, 2), (-1, -2)
+]
+
+
+king_moves = [
+    (1, 1), (1, -1), (-1, 1), (-1, -1),
+    (1, 0), (-1, 0), (0, 1), (0, -1)
 ]
 
 def is_valid_position(position):
@@ -58,6 +66,13 @@ def bfs_knight_to_king(knight_position, king_position):
 
     return None
 
+def is_valid_king_move(current_king_position, new_king_position):
+    """Check if the king's move is valid (one step in any direction)."""
+    col_diff = columns.index(new_king_position[0]) - columns.index(current_king_position[0])
+    row_diff = int(new_king_position[1]) - int(current_king_position[1])
+
+    return (col_diff, row_diff) in king_moves
+
 def knight_turn(knight_position, king_position):
     """Program's turn to move the knight towards the king."""
     print(f"Knight's current position: {knight_position}")
@@ -69,11 +84,11 @@ def knight_turn(knight_position, king_position):
     return knight_position
 
 def king_turn(knight_position, current_king_position):
-    """Player's turn to move the king. The king cannot stay in the same position."""
+    """Player's turn to move the king. The king must make a valid move."""
     new_king_position = input(f"Your turn! Enter new King position (e.g., 'e4') avoiding knight at {knight_position}: ").lower()
 
-    while not is_valid_position(new_king_position) or new_king_position == current_king_position or new_king_position == knight_position:
-        new_king_position = input("Invalid or blocked position! Enter a valid new position: ").lower()
+    while not is_valid_position(new_king_position) or new_king_position == current_king_position or not is_valid_king_move(current_king_position, new_king_position) or new_king_position == knight_position:
+        new_king_position = input("Invalid move! Enter a valid new King position (following king's move rules): ").lower()
 
     return new_king_position
 
@@ -89,7 +104,6 @@ def game_loop():
     print(f"Game start! Knight starts at {knight_position}, King starts at {king_position}")
 
     while knight_position != king_position:
-
         knight_position = knight_turn(knight_position, king_position)
 
         if knight_position == king_position:
