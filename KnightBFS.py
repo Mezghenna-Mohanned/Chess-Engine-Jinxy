@@ -2,7 +2,7 @@ import random
 from collections import deque
 
 columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-rows = [8, 7, 6, 5, 4, 3, 2, 1]
+rows = [8, 7, 6, 6, 5, 4, 3, 2, 1]
 knight_moves = [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (1, -2), (-1, 2), (-1, -2)]
 king_moves = [(1, 1), (1, -1), (-1, 1), (-1, -1), (1, 0), (-1, 0), (0, 1), (0, -1)]
 
@@ -75,7 +75,9 @@ def get_valid_king_moves(king_position, knight_position):
 def knight_turn(knight_position, king_position):
     path = bfs_knight_to_king(knight_position, king_position)
     if path and len(path) > 1:
-        return path[1]
+        new_knight_position = path[1]
+        print(f"Knight moves to: {new_knight_position}")
+        return new_knight_position
     return knight_position
 
 def king_turn(knight_position, current_king_position):
