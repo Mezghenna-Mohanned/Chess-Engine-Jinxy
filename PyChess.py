@@ -1,7 +1,6 @@
 import chess
 import random
 
-
 piece_values = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -30,9 +29,21 @@ def get_player_move(board):
 
 def evaluate_board(board):
     evaluation = 0
+
     for piece in chess.PIECE_TYPES:
         evaluation += len(board.pieces(piece, chess.WHITE)) * piece_values[piece]
         evaluation -= len(board.pieces(piece, chess.BLACK)) * piece_values[piece]
+
+    for move in board.legal_moves:
+        target_square = move.to_square
+        target_piece = board.piece_at(target_square)
+
+        if target_piece and target_piece.color == chess.BLACK:
+            evaluation += piece_values[target_piece.piece_type]
+
+        if board.is_attacked_by(chess.BLACK, move.from_square):
+            evaluation -= piece_values[board.piece_at(move.from_square).piece_type] * 0.5
+
     return evaluation
 
 def get_ai_move(board):
@@ -62,9 +73,10 @@ def main():
             print("Exiting the game.")
             break
         board.push(player_move)
+
         if board.is_game_over():
             break
-        
+
         print("AI's turn (Black):")
         ai_move = get_ai_move(board)
         board.push(ai_move)
