@@ -29,36 +29,54 @@ def get_player_move(board):
 
 def evaluate_board(board):
     evaluation = 0
-
     for piece in chess.PIECE_TYPES:
         evaluation += len(board.pieces(piece, chess.WHITE)) * piece_values[piece]
         evaluation -= len(board.pieces(piece, chess.BLACK)) * piece_values[piece]
 
-    for move in board.legal_moves:
-        target_square = move.to_square
-        target_piece = board.piece_at(target_square)
-
-        if target_piece and target_piece.color == chess.BLACK:
-            evaluation += piece_values[target_piece.piece_type]
-
-        if board.is_attacked_by(chess.BLACK, move.from_square):
-            evaluation -= piece_values[board.piece_at(move.from_square).piece_type] * 0.5
-
     return evaluation
 
-def get_ai_move(board):
+def minimax_alpha_beta(board, depth, alpha, beta, maximizing_player):
+    if depth == 0 or board.is_game_over():
+        return evaluate_board(board)
+
+    if maximizing_player:
+        max_eval = -float('inf')
+        for move in board.legal_moves:
+            board.push(move)
+            eval = minimax_alpha_beta(board, depth - 1, alpha, beta, False)
+            board.pop()
+            max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break
+        return max_eval
+    else:
+        min_eval = float('inf')
+        for move in board.legal_moves:
+            board.push(move)
+            eval = minimax_alpha_beta(board, depth - 1, alpha, beta, True)
+            board.pop()
+            min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
+        return min_eval
+
+def get_ai_move(board, depth=3):
     best_move = None
     best_value = -float('inf')
+    alpha = -float('inf')
+    beta = float('inf')
 
     for move in board.legal_moves:
         board.push(move)
-        move_value = evaluate_board(board)
+        move_value = minimax_alpha_beta(board, depth - 1, alpha, beta, False)
         board.pop()
 
         if move_value > best_value:
             best_value = move_value
             best_move = move
-            
+
     return best_move if best_move else random.choice(list(board.legal_moves))
 
 def main():
@@ -78,7 +96,7 @@ def main():
             break
 
         print("AI's turn (Black):")
-        ai_move = get_ai_move(board)
+        ai_move = get_ai_move(board, depth=3)
         board.push(ai_move)
 
     print_board(board)
