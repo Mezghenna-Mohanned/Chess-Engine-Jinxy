@@ -19,7 +19,7 @@ def get_valid_rook_moves(rook_position):
     row_index = rows.index(rook_position[1])
 
     for direction in rook_directions:
-        for step in range(1, 8):  # Allow movement up to 7 squares in any direction
+        for step in range(1, 8):
             new_col_index = col_index + direction[0] * step
             new_row_index = row_index + direction[1] * step
 
@@ -27,7 +27,7 @@ def get_valid_rook_moves(rook_position):
                 new_position = f"{columns[new_col_index]}{rows[new_row_index]}"
                 valid_moves.append(new_position)
             else:
-                break  # Stop if it goes off the board
+                break
 
     return valid_moves
 
@@ -54,7 +54,7 @@ def is_valid_king_move(current_king_position, new_king_position):
     row_diff = rows.index(new_king_position[1]) - rows.index(current_king_position[1])
     return (col_diff, row_diff) in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 
-def get_valid_king_moves(king_position, rook_position):
+def get_valid_king_moves(king_position):
     valid_moves = []
     col_index = columns.index(king_position[0])
     row_index = rows.index(king_position[1])
@@ -64,38 +64,42 @@ def get_valid_king_moves(king_position, rook_position):
         new_row_index = row_index + move[1]
 
         if 0 <= new_col_index < 8 and 0 <= new_row_index < 8:
-            new_position = f"{columns[new_col_index]}{rows[new_row_index]}"
-            if new_position not in get_valid_rook_moves(rook_position):
-                valid_moves.append(new_position)
+            valid_moves.append(f"{columns[new_col_index]}{rows[new_row_index]}")
 
     return valid_moves
 
 def rook_turn(rook_position, king_position):
     valid_moves = get_valid_rook_moves(rook_position)
 
-    # Check for safe moves that also put the King in check
-    safe_moves = [
-        move for move in valid_moves 
-        if (move[0] == king_position[0] or move[1] == king_position[1]) 
-        and move not in get_valid_king_moves(king_position, rook_position)
+    king_possible_moves = get_valid_king_moves(king_position)
+
+    safe_moves = [move for move in valid_moves if move not in king_possible_moves]
+
+    check_moves = [
+        move for move in safe_moves 
+        if (move[0] == king_position[0] or move[1] == king_position[1])
     ]
 
     if safe_moves:
-        for move in safe_moves:
-            if move not in get_valid_king_moves(king_position, rook_position):
-                print(f"Rook moves to: {move} and puts King in check!")
-                return move
-    
+        if check_moves:
+            move = check_moves[0]
+            print(f"Rook moves to: {move} and puts King in check!")
+            return move
+        else:
+            move = safe_moves[0]
+            print(f"Rook moves to: {move} to stay safe!")
+            return move
+
     path = bfs_rook_to_king(rook_position, king_position)
     if path and len(path) > 1:
         new_rook_position = path[1]
-        print(f"Rook moves to: {new_rook_position}")
+        print(f"Rook moves to: {new_rook_position} towards King.")
         return new_rook_position
     
     return rook_position
 
 def king_turn(rook_position, current_king_position):
-    valid_moves = get_valid_king_moves(current_king_position, rook_position)
+    valid_moves = get_valid_king_moves(current_king_position)
     new_king_position = input(f"Your turn! Enter new King position (e.g., 'e4') avoiding rook at {rook_position}: ").lower()
 
     while new_king_position not in valid_moves:
@@ -107,7 +111,7 @@ def is_king_in_check(rook_position, king_position):
     return king_position in get_valid_rook_moves(rook_position)
 
 def can_king_capture_rook(rook_position, king_position):
-    return rook_position in get_valid_king_moves(king_position, rook_position)
+    return rook_position in get_valid_king_moves(king_position)
 
 def game_loop():
     rook_position = random_position()
