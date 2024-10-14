@@ -1,6 +1,7 @@
 import chess
 import random
 
+# Piece values for evaluation
 piece_values = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -91,33 +92,38 @@ def ai_move(board, depth):
     return best_move
 
 def find_opening_match(board, opening_fens):
-    current_fen = board.board_fen()
+    current_fen = board.fen()
+    print(f"Current FEN: {current_fen}")
     for fen in opening_fens:
-        if fen.startswith(current_fen):
-            return fen
+      if current_fen == fen:
+          print("Found a match!")
+          break
+
     return None
+
 
 def play_game_with_openings(pgn_file, epd_file1, epd_file2):
     board = chess.Board()
     opening_fens = load_opening_fens(pgn_file) + load_opening_fens_from_epd(epd_file1) + load_opening_fens_from_epd(epd_file2)
-    
-    print("Starting with a standard chess position:")
+
+    print("Starting with a standard chess position:\n")
     print(board)
 
     while not board.is_game_over():
+        print("\nCurrent board position:")
         print(board)
         if board.turn == chess.WHITE:
-            user_move = input("Your turn (White): Enter your move: ")
-            try:
-                move = chess.Move.from_uci(user_move)
-                if move in board.legal_moves:
-                    board.push(move)
-                else:
-                    print("Illegal move, try again.")
-                    continue
-            except:
-                print("Invalid move format, try again.")
-                continue
+            while True:
+                user_move = input("Your turn (White): Enter your move: ")
+                try:
+                    move = chess.Move.from_uci(user_move)
+                    if move in board.legal_moves:
+                        board.push(move)
+                        break
+                    else:
+                        print("Illegal move, try again.")
+                except Exception as e:
+                    print("Invalid move format, try again.")
         else:
             print("AI's turn (Black):")
             matching_opening_fen = find_opening_match(board, opening_fens)
@@ -129,6 +135,7 @@ def play_game_with_openings(pgn_file, epd_file1, epd_file2):
                 move = ai_move(board, depth=3)
                 board.push(move)
 
+    print("\nFinal board position:")
     print(board)
     print("Game over!")
     result = board.result()
