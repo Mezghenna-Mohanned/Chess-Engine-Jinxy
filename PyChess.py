@@ -93,56 +93,7 @@ def ai_move(board, depth):
 
 def find_opening_match(board, opening_fens):
     current_fen = board.fen()
-    print(f"Current FEN: {current_fen}")
     for fen in opening_fens:
-      if current_fen == fen:
-          print("Found a match!")
-          break
-
+        if current_fen == fen:
+            return fen
     return None
-
-
-def play_game_with_openings(pgn_file, epd_file1, epd_file2):
-    board = chess.Board()
-    opening_fens = load_opening_fens(pgn_file) + load_opening_fens_from_epd(epd_file1) + load_opening_fens_from_epd(epd_file2)
-
-    print("Starting with a standard chess position:\n")
-    print(board)
-
-    while not board.is_game_over():
-        print("\nCurrent board position:")
-        print(board)
-        if board.turn == chess.WHITE:
-            while True:
-                user_move = input("Your turn (White): Enter your move: ")
-                try:
-                    move = chess.Move.from_uci(user_move)
-                    if move in board.legal_moves:
-                        board.push(move)
-                        break
-                    else:
-                        print("Illegal move, try again.")
-                except Exception as e:
-                    print("Invalid move format, try again.")
-        else:
-            print("AI's turn (Black):")
-            matching_opening_fen = find_opening_match(board, opening_fens)
-            if matching_opening_fen:
-                print(f"AI found a matching opening position: {matching_opening_fen}")
-                board.set_fen(matching_opening_fen)
-            else:
-                print("No matching opening found. Proceeding with regular AI move.")
-                move = ai_move(board, depth=3)
-                board.push(move)
-
-    print("\nFinal board position:")
-    print(board)
-    print("Game over!")
-    result = board.result()
-    print(f"Result: {result}")
-
-if __name__ == "__main__":
-    pgn_file = r"C:\Users\firefly\Documents\chessOp\TwoMoves_v1.pgn"
-    epd_file1 = r"C:\Users\firefly\Documents\chessOp\dFRC_openings.epd"
-    epd_file2 = r"C:\Users\firefly\Documents\chessOp\popularpos_lichess.epd"
-    play_game_with_openings(pgn_file, epd_file1, epd_file2)
