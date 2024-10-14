@@ -80,14 +80,13 @@ def ai_move(board, depth):
     return best_move
 
 def play_game_with_openings(pgn_file):
-    # Start with a standard chess board
     board = chess.Board()
     
     opening_fens = load_opening_fens(pgn_file)
     
     print("Starting with a standard chess position:")
     print(board)
-    
+
     opening_used = False
 
     while not board.is_game_over():
@@ -100,16 +99,23 @@ def play_game_with_openings(pgn_file):
                     board.push(move)
                 else:
                     print("Illegal move, try again.")
+                    continue
             except:
                 print("Invalid move format, try again.")
-
+                continue
         else:
             print("AI's turn (Black):")
             if not opening_used:
-                chosen_fen = random.choice(opening_fens)
-                print(f"AI chooses an opening from the book starting from this position: {chosen_fen}")
-                board.set_fen(chosen_fen)
-                opening_used = True
+                matching_openings = [fen for fen in opening_fens if fen.startswith(board.fen())]
+                if matching_openings:
+                    chosen_fen = random.choice(matching_openings)
+                    print(f"AI chooses an opening matching your move: {chosen_fen}")
+                    board.set_fen(chosen_fen)
+                    opening_used = True
+                else:
+                    print("No matching opening found. Proceeding with regular AI move.")
+                    move = ai_move(board, depth=3)
+                    board.push(move)
             else:
                 move = ai_move(board, depth=3)
                 board.push(move)
