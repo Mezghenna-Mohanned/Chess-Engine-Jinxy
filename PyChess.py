@@ -10,6 +10,16 @@ piece_values = {
     chess.KING: 0
 }
 
+def load_opening_fens(pgn_file):
+    fens = []
+    with open(pgn_file, 'r') as file:
+        lines = file.readlines()
+        for line in lines:
+            if line.startswith('[FEN'):
+                fen = line.split('"')[1]
+                fens.append(fen)
+    return fens
+
 def evaluate_board(board):
     score = 0
     for square in chess.SQUARES:
@@ -69,13 +79,19 @@ def ai_move(board, depth):
 
     return best_move
 
-def play_game():
-    board = chess.Board()
+def play_game_with_openings(pgn_file):
 
+    opening_fens = load_opening_fens(pgn_file)
+    chosen_fen = random.choice(opening_fens)
+    board = chess.Board(fen=chosen_fen)
+    
+    print("Starting from opening book position:")
+    print(board)
+    
     while not board.is_game_over():
         print(board)
         if board.turn == chess.WHITE:
-            user_move = input("Your turn (White): Enter your move (e.g., e2e4): ")
+            user_move = input("Your turn (White): Enter your move: ")
             move = chess.Move.from_uci(user_move)
             if move in board.legal_moves:
                 board.push(move)
@@ -92,4 +108,5 @@ def play_game():
     print(f"Result: {result}")
 
 if __name__ == "__main__":
-    play_game()
+    pgn_file = r"C:\Users\firefly\Documents\chessOp\TwoMoves_v1.pgn"
+    play_game_with_openings(pgn_file)
