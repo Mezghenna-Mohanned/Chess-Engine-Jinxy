@@ -20,6 +20,17 @@ def load_opening_fens(pgn_file):
                 fens.append(fen)
     return fens
 
+def load_opening_fens_from_epd(epd_file):
+    fens = []
+    with open(epd_file, 'r') as file:
+        lines = file.readlines()
+        for line in lines:
+            if line.strip():
+                parts = line.split(';')
+                fen = parts[0].strip()
+                fens.append(fen)
+    return fens
+
 def evaluate_board(board):
     score = 0
     for square in chess.SQUARES:
@@ -79,15 +90,19 @@ def ai_move(board, depth):
 
     return best_move
 
-def play_game_with_openings(pgn_file):
+def find_opening_match(board, opening_fens):
+    current_fen = board.board_fen()
+    for fen in opening_fens:
+        if fen.startswith(current_fen):
+            return fen
+    return None
+
+def play_game_with_openings(pgn_file, epd_file1, epd_file2):
     board = chess.Board()
-    
-    opening_fens = load_opening_fens(pgn_file)
+    opening_fens = load_opening_fens(pgn_file) + load_opening_fens_from_epd(epd_file1) + load_opening_fens_from_epd(epd_file2)
     
     print("Starting with a standard chess position:")
     print(board)
-
-    opening_used = False
 
     while not board.is_game_over():
         print(board)
@@ -105,18 +120,12 @@ def play_game_with_openings(pgn_file):
                 continue
         else:
             print("AI's turn (Black):")
-            if not opening_used:
-                matching_openings = [fen for fen in opening_fens if fen.startswith(board.fen())]
-                if matching_openings:
-                    chosen_fen = random.choice(matching_openings)
-                    print(f"AI chooses an opening matching your move: {chosen_fen}")
-                    board.set_fen(chosen_fen)
-                    opening_used = True
-                else:
-                    print("No matching opening found. Proceeding with regular AI move.")
-                    move = ai_move(board, depth=3)
-                    board.push(move)
+            matching_opening_fen = find_opening_match(board, opening_fens)
+            if matching_opening_fen:
+                print(f"AI found a matching opening position: {matching_opening_fen}")
+                board.set_fen(matching_opening_fen)
             else:
+                print("No matching opening found. Proceeding with regular AI move.")
                 move = ai_move(board, depth=3)
                 board.push(move)
 
@@ -127,4 +136,6 @@ def play_game_with_openings(pgn_file):
 
 if __name__ == "__main__":
     pgn_file = r"C:\Users\firefly\Documents\chessOp\TwoMoves_v1.pgn"
-    play_game_with_openings(pgn_file)
+    epd_file1 = r"C:\Users\firefly\Documents\chessOp\dFRC_openings.epd"
+    epd_file2 = r"C:\Users\firefly\Documents\chessOp\popularpos_lichess.epd"
+    play_game_with_openings(pgn_file, epd_file1, epd_file2)
