@@ -1,11 +1,11 @@
 import chess
-from find_best_move import find_best_move, load_opening_book
+from find_best_move import find_best_move
 
 def main():
     """Main function to run the chess AI."""
-    opening_book = load_opening_book(r"C:\Users\firefly\Documents\chessOp\lichess_db_standard_rated_2014-07.pgn")
+
     board = chess.Board()
-    depth = 4
+    depth = 2
 
     while not board.is_game_over():
         print(board)
@@ -22,10 +22,11 @@ def main():
         except ValueError:
             print("Invalid move format. Please use UCI format.")
             continue
+
         ai_move_result = find_best_move(board, depth)
         if ai_move_result:
-            board.push(ai_move_result)
             print(f"AI plays: {ai_move_result}")
+            board.push(ai_move_result)
         else:
             print("AI cannot make a move.")
 
