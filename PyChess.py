@@ -1,7 +1,5 @@
 import chess
-import random
 
-# Piece values for evaluation
 piece_values = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -10,6 +8,8 @@ piece_values = {
     chess.QUEEN: 9,
     chess.KING: 0
 }
+
+center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 def load_opening_fens(pgn_file):
     fens = []
@@ -32,21 +32,62 @@ def load_opening_fens_from_epd(epd_file):
                 fens.append(fen)
     return fens
 
+def is_protected(board, square):
+    attackers = board.attackers(board.turn, square)
+    return len(list(attackers)) > 0
+
+def can_capture(board, square):
+    attackers = board.attackers(not board.turn, square)
+    return len(list(attackers)) > 0
+
 def evaluate_board(board):
     score = 0
     for square in chess.SQUARES:
         piece = board.piece_at(square)
         if piece is not None:
             value = piece_values[piece.piece_type]
+
             if piece.color == chess.WHITE:
                 score += value
+                if is_protected(board, square):
+                    score += 0.5
+                if square in center_squares:
+                    score += 0.5
+                if can_capture(board, square):
+                    score += value * 0.5
+
             else:
                 score -= value
+                if is_protected(board, square):
+                    score -= 0.5
+                if square in center_squares:
+                    score -= 0.5
+                if can_capture(board, square):
+                    score -= value * 0.5
     return score
+
+def quiescence_search(board, alpha, beta):
+    stand_pat = evaluate_board(board)
+    if stand_pat >= beta:
+        return beta
+    if alpha < stand_pat:
+        alpha = stand_pat
+
+    for move in board.legal_moves:
+        if board.is_capture(move):
+            board.push(move)
+            score = -quiescence_search(board, -beta, -alpha)
+            board.pop()
+
+            if score >= beta:
+                return beta
+            if score > alpha:
+                alpha = score
+    return alpha
 
 def minimax(board, depth, alpha, beta, is_maximizing_player):
     if depth == 0 or board.is_game_over():
-        return evaluate_board(board)
+        return quiescence_search(board, alpha, beta)
 
     legal_moves = list(board.legal_moves)
 
@@ -74,11 +115,14 @@ def minimax(board, depth, alpha, beta, is_maximizing_player):
         return min_eval
 
 def ai_move(board, depth):
+    if board.is_game_over():
+        print("Game over!")
+        return None
+
     best_move = None
     best_value = -float('inf')
 
     legal_moves = list(board.legal_moves)
-    random.shuffle(legal_moves)
 
     for move in legal_moves:
         board.push(move)
@@ -90,6 +134,7 @@ def ai_move(board, depth):
             best_move = move
 
     return best_move
+
 
 def find_opening_match(board, opening_fens):
     current_fen = board.fen()
