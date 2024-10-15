@@ -3,9 +3,10 @@ from find_best_move import find_best_move
 
 def main():
     """Main function to run the chess AI."""
-
+    
     board = chess.Board()
     depth = 2
+    use_alpha_beta = True
 
     while not board.is_game_over():
         print(board)
@@ -23,15 +24,16 @@ def main():
             print("Invalid move format. Please use UCI format.")
             continue
 
-        ai_move_result = find_best_move(board, depth)
+        ai_move_result = find_best_move(board, depth, use_alpha_beta)
         if ai_move_result:
-            print(f"AI plays: {ai_move_result}")
+            print(f"AI move: {ai_move_result}")
             board.push(ai_move_result)
         else:
-            print("AI cannot make a move.")
+            print("AI couldn't find a valid move. Ending game.")
+            break
 
-    print("Game over!")
-    print("Result:", board.result())
+    print("Game Over")
+    print(f"Result: {board.result()}")
 
 if __name__ == "__main__":
     main()
