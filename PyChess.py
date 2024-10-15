@@ -1,144 +1,36 @@
 import chess
+from find_best_move import find_best_move, load_opening_book
 
-piece_values = {
-    chess.PAWN: 1,
-    chess.KNIGHT: 3,
-    chess.BISHOP: 3,
-    chess.ROOK: 5,
-    chess.QUEEN: 9,
-    chess.KING: 0
-}
+def main():
+    """Main function to run the chess AI."""
+    opening_book = load_opening_book(r"C:\Users\firefly\Documents\chessOp\lichess_db_standard_rated_2014-07.pgn")
+    board = chess.Board()
+    depth = 4
 
-center_squares = [chess.D4, chess.E4, chess.D5, chess.E5]
+    while not board.is_game_over():
+        print(board)
+        print("\n")
 
-def load_opening_fens(pgn_file):
-    fens = []
-    with open(pgn_file, 'r') as file:
-        lines = file.readlines()
-        for line in lines:
-            if line.startswith('[FEN'):
-                fen = line.split('"')[1]
-                fens.append(fen)
-    return fens
-
-def load_opening_fens_from_epd(epd_file):
-    fens = []
-    with open(epd_file, 'r') as file:
-        lines = file.readlines()
-        for line in lines:
-            if line.strip():
-                parts = line.split(';')
-                fen = parts[0].strip()
-                fens.append(fen)
-    return fens
-
-def is_protected(board, square):
-    attackers = board.attackers(board.turn, square)
-    return len(list(attackers)) > 0
-
-def can_capture(board, square):
-    attackers = board.attackers(not board.turn, square)
-    return len(list(attackers)) > 0
-
-def evaluate_board(board):
-    score = 0
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece is not None:
-            value = piece_values[piece.piece_type]
-
-            if piece.color == chess.WHITE:
-                score += value
-                if is_protected(board, square):
-                    score += 0.5
-                if square in center_squares:
-                    score += 0.5
-                if can_capture(board, square):
-                    score += value * 0.5
-
+        player_move = input("Enter your move (in UCI format, e.g., e2e4): ")
+        try:
+            move = chess.Move.from_uci(player_move)
+            if move in board.legal_moves:
+                board.push(move)
             else:
-                score -= value
-                if is_protected(board, square):
-                    score -= 0.5
-                if square in center_squares:
-                    score -= 0.5
-                if can_capture(board, square):
-                    score -= value * 0.5
-    return score
+                print("Invalid move. Please try again.")
+                continue
+        except ValueError:
+            print("Invalid move format. Please use UCI format.")
+            continue
+        ai_move_result = find_best_move(board, depth)
+        if ai_move_result:
+            board.push(ai_move_result)
+            print(f"AI plays: {ai_move_result}")
+        else:
+            print("AI cannot make a move.")
 
-def quiescence_search(board, alpha, beta):
-    stand_pat = evaluate_board(board)
-    if stand_pat >= beta:
-        return beta
-    if alpha < stand_pat:
-        alpha = stand_pat
+    print("Game over!")
+    print("Result:", board.result())
 
-    for move in board.legal_moves:
-        if board.is_capture(move):
-            board.push(move)
-            score = -quiescence_search(board, -beta, -alpha)
-            board.pop()
-
-            if score >= beta:
-                return beta
-            if score > alpha:
-                alpha = score
-    return alpha
-
-def minimax(board, depth, alpha, beta, is_maximizing_player):
-    if depth == 0 or board.is_game_over():
-        return quiescence_search(board, alpha, beta)
-
-    legal_moves = list(board.legal_moves)
-
-    if is_maximizing_player:
-        max_eval = -float('inf')
-        for move in legal_moves:
-            board.push(move)
-            eval = minimax(board, depth - 1, alpha, beta, False)
-            board.pop()
-            max_eval = max(max_eval, eval)
-            alpha = max(alpha, eval)
-            if beta <= alpha:
-                break
-        return max_eval
-    else:
-        min_eval = float('inf')
-        for move in legal_moves:
-            board.push(move)
-            eval = minimax(board, depth - 1, alpha, beta, True)
-            board.pop()
-            min_eval = min(min_eval, eval)
-            beta = min(beta, eval)
-            if beta <= alpha:
-                break
-        return min_eval
-
-def ai_move(board, depth):
-    if board.is_game_over():
-        print("Game over!")
-        return None
-
-    best_move = None
-    best_value = -float('inf')
-
-    legal_moves = list(board.legal_moves)
-
-    for move in legal_moves:
-        board.push(move)
-        board_value = minimax(board, depth - 1, -float('inf'), float('inf'), False)
-        board.pop()
-
-        if board_value > best_value:
-            best_value = board_value
-            best_move = move
-
-    return best_move
-
-
-def find_opening_match(board, opening_fens):
-    current_fen = board.fen()
-    for fen in opening_fens:
-        if current_fen == fen:
-            return fen
-    return None
+if __name__ == "__main__":
+    main()
