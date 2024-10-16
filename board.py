@@ -348,6 +348,28 @@ class Board:
             if bitboard & (1 << square):
                 return piece
         return None
+    
+    def is_capture_move(self, move):
+        target_piece = self.get_piece_at_square(move.to_square)
+        if target_piece is not None:
+            return target_piece.isupper() != move.piece.isupper()
+        return False
+
+    def generate_capture_moves(self):
+        capture_moves = []
+        all_moves = self.generate_legal_moves()
+        for move in all_moves:
+            if self.is_capture_move(move):
+                capture_moves.append(move)
+        return capture_moves
+
+    def get_piece_value(self, piece):
+            piece_values = {
+                'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000,
+                'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
+            }
+            return piece_values.get(piece, 0)
+
 
     def evaluate(self):
         return evaluate(self)
