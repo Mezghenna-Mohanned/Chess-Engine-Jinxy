@@ -31,7 +31,7 @@ INITIAL_POSITIONS = {
 }
 
 POSITIONAL_VALUES = {
-    # Positional values for Knights (you can add for other pieces similarly)
+
     'N': [
         -5, -4, -3, -3, -3, -3, -4, -5,
         -4, -2,  0,  0,  0,  0, -2, -4,

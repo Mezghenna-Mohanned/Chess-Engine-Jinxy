@@ -1,5 +1,3 @@
-# move_generation.py
-
 from constants import (
     FILE_A, FILE_H, RANK_1, RANK_4, RANK_5, RANK_8,
     KNIGHT_MOVES, KING_MOVES, RANK_MASKS, FILE_MASKS
@@ -52,75 +50,72 @@ def generate_pawn_moves(board, pawn_piece):
     empty_squares = ~board.occupied & 0xFFFFFFFFFFFFFFFF
 
     if is_white:
-
         one_step = (pawns << 8) & empty_squares
         promotion_moves = one_step & RANK_MASKS[7]
         one_step &= ~RANK_MASKS[7]
-        two_step = ((one_step & RANK_MASKS[2]) << 8) & empty_squares
-
+        two_step = ((pawns & RANK_MASKS[1]) << 16) & empty_squares & (empty_squares << 8)
         captures_left = (pawns << 7) & board.occupied_black & ~FILE_MASKS[7]
         captures_right = (pawns << 9) & board.occupied_black & ~FILE_MASKS[0]
-        #en passant
-        en_passant_left = (pawns << 7) & FILE_MASKS[board.en_passant_target % 8] if board.en_passant_target else 0
-        en_passant_right = (pawns << 9) & FILE_MASKS[board.en_passant_target % 8] if board.en_passant_target else 0
+        en_passant_left = (pawns << 7) & (1 << board.en_passant_target) if board.en_passant_target else 0
+        en_passant_right = (pawns << 9) & (1 << board.en_passant_target) if board.en_passant_target else 0
     else:
         one_step = (pawns >> 8) & empty_squares
         promotion_moves = one_step & RANK_MASKS[0]
         one_step &= ~RANK_MASKS[0]
-        two_step = ((one_step & RANK_MASKS[5]) >> 8) & empty_squares
-        captures_left = (pawns >> 9) & board.occupied_white & ~FILE_MASKS[7]
-        captures_right = (pawns >> 7) & board.occupied_white & ~FILE_MASKS[0]
-        en_passant_left = (pawns >> 9) & FILE_MASKS[board.en_passant_target % 8] if board.en_passant_target else 0
-        en_passant_right = (pawns >> 7) & FILE_MASKS[board.en_passant_target % 8] if board.en_passant_target else 0
+        two_step = ((pawns & RANK_MASKS[6]) >> 16) & empty_squares & (empty_squares >> 8)
+        captures_left = (pawns >> 9) & board.occupied_white & ~FILE_MASKS[0]
+        captures_right = (pawns >> 7) & board.occupied_white & ~FILE_MASKS[7]
+        en_passant_left = (pawns >> 9) & (1 << board.en_passant_target) if board.en_passant_target else 0
+        en_passant_right = (pawns >> 7) & (1 << board.en_passant_target) if board.en_passant_target else 0
 
-    moves.extend(create_pawn_moves(pawn_piece, one_step, is_double=False, promotion=False))
-    moves.extend(create_pawn_moves(pawn_piece, two_step, is_double=True, promotion=False))
-    moves.extend(create_pawn_captures(pawn_piece, captures_left, captures_right, promotion=False))
-    moves.extend(create_pawn_moves(pawn_piece, promotion_moves, is_double=False, promotion=True))
-    moves.extend(create_pawn_captures(pawn_piece, captures_left & RANK_MASKS[7 if is_white else 0],
-                                      captures_right & RANK_MASKS[7 if is_white else 0], promotion=True))
-    moves.extend(create_pawn_moves(pawn_piece, en_passant_left, is_double=False, promotion=False, en_passant=True))
-    moves.extend(create_pawn_moves(pawn_piece, en_passant_right, is_double=False, promotion=False, en_passant=True))
+    moves.extend(create_pawn_moves(pawn_piece, one_step, 8, is_double=False, promotion=False))
+    moves.extend(create_pawn_moves(pawn_piece, two_step, 16, is_double=True, promotion=False))
+    moves.extend(create_pawn_captures(pawn_piece, captures_left, 7, promotion=False))
+    moves.extend(create_pawn_captures(pawn_piece, captures_right, 9, promotion=False))
+    moves.extend(create_pawn_moves(pawn_piece, promotion_moves, 8, is_double=False, promotion=True))
+    moves.extend(create_pawn_captures(pawn_piece, captures_left & RANK_MASKS[7 if is_white else 0], 7, promotion=True))
+    moves.extend(create_pawn_captures(pawn_piece, captures_right & RANK_MASKS[7 if is_white else 0], 9, promotion=True))
+    moves.extend(create_pawn_captures(pawn_piece, en_passant_left, 7, en_passant=True))
+    moves.extend(create_pawn_captures(pawn_piece, en_passant_right, 9, en_passant=True))
 
     return moves
 
-def create_pawn_moves(pawn_piece, bitboard, is_double=False, promotion=False, en_passant=False):
+def create_pawn_moves(pawn_piece, bitboard, shift, is_double=False, promotion=False):
     moves = []
+    is_white = pawn_piece.isupper()
     while bitboard:
         to_square = (bitboard & -bitboard).bit_length() - 1
-        from_square = to_square - 8 if pawn_piece.isupper() else to_square + 8
-        if is_double:
-            from_square -= 8 if pawn_piece.isupper() else -8
+        from_square = to_square - shift if is_white else to_square + shift
         if promotion:
             for promotion_piece in ['Q', 'R', 'B', 'N']:
-                prom_piece = promotion_piece if pawn_piece.isupper() else promotion_piece.lower()
+                prom_piece = promotion_piece if is_white else promotion_piece.lower()
                 moves.append(Move(pawn_piece, from_square, to_square, promotion=prom_piece))
         else:
             moves.append(Move(pawn_piece, from_square, to_square))
         bitboard &= bitboard - 1
     return moves
 
-def create_pawn_captures(pawn_piece, captures_left, captures_right, promotion=False):
+def create_pawn_captures(pawn_piece, bitboard, shift, promotion=False, en_passant=False):
     moves = []
-    for bitboard in [captures_left, captures_right]:
-        while bitboard:
-            to_square = (bitboard & -bitboard).bit_length() - 1
-            from_square = to_square - 7 if pawn_piece.isupper() else to_square + 9 if bitboard is captures_left else \
-                          to_square - 9 if pawn_piece.isupper() else to_square + 7
-            if promotion:
-                for promotion_piece in ['Q', 'R', 'B', 'N']:
-                    prom_piece = promotion_piece if pawn_piece.isupper() else promotion_piece.lower()
-                    moves.append(Move(pawn_piece, from_square, to_square, promotion=prom_piece))
-            else:
-                moves.append(Move(pawn_piece, from_square, to_square))
-            bitboard &= bitboard - 1
+    is_white = pawn_piece.isupper()
+    while bitboard:
+        to_square = (bitboard & -bitboard).bit_length() - 1
+        from_square = to_square - shift if is_white else to_square + shift
+        if promotion:
+            for promotion_piece in ['Q', 'R', 'B', 'N']:
+                prom_piece = promotion_piece if is_white else promotion_piece.lower()
+                moves.append(Move(pawn_piece, from_square, to_square, promotion=prom_piece))
+        elif en_passant:
+            moves.append(Move(pawn_piece, from_square, to_square))
+        else:
+            moves.append(Move(pawn_piece, from_square, to_square))
+        bitboard &= bitboard - 1
     return moves
 
 def generate_knight_moves(board, piece, from_square):
     moves = []
     own_pieces = board.occupied_white if piece.isupper() else board.occupied_black
     knight_attacks = KNIGHT_MOVES[from_square] & ~own_pieces
-
     while knight_attacks:
         to_square = (knight_attacks & -knight_attacks).bit_length() - 1
         moves.append(Move(piece, from_square, to_square))
@@ -131,7 +126,6 @@ def generate_bishop_moves(board, piece, from_square):
     moves = []
     own_pieces = board.occupied_white if piece.isupper() else board.occupied_black
     attacks = generate_sliding_attacks(from_square, board.occupied, 'bishop') & ~own_pieces
-
     while attacks:
         to_square = (attacks & -attacks).bit_length() - 1
         moves.append(Move(piece, from_square, to_square))
@@ -142,7 +136,6 @@ def generate_rook_moves(board, piece, from_square):
     moves = []
     own_pieces = board.occupied_white if piece.isupper() else board.occupied_black
     attacks = generate_sliding_attacks(from_square, board.occupied, 'rook') & ~own_pieces
-
     while attacks:
         to_square = (attacks & -attacks).bit_length() - 1
         moves.append(Move(piece, from_square, to_square))
@@ -153,7 +146,6 @@ def generate_queen_moves(board, piece, from_square):
     moves = []
     own_pieces = board.occupied_white if piece.isupper() else board.occupied_black
     attacks = generate_sliding_attacks(from_square, board.occupied, 'queen') & ~own_pieces
-
     while attacks:
         to_square = (attacks & -attacks).bit_length() - 1
         moves.append(Move(piece, from_square, to_square))
@@ -164,7 +156,6 @@ def generate_king_moves(board, piece, from_square):
     moves = []
     own_pieces = board.occupied_white if piece.isupper() else board.occupied_black
     king_attacks = KING_MOVES[from_square] & ~own_pieces
-
     while king_attacks:
         to_square = (king_attacks & -king_attacks).bit_length() - 1
         moves.append(Move(piece, from_square, to_square))
@@ -184,8 +175,7 @@ def generate_sliding_attacks(square, occupied, piece_type):
                 break
     return attacks
 
-
-SQUARES = [{ 'neighbors': {} } for _ in range(64)]
+SQUARES = [{'neighbors': {}} for _ in range(64)]
 DIRECTIONS = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW']
 SLIDING_DIRECTIONS = {
     'rook': ['N', 'S', 'E', 'W'],
@@ -224,22 +214,22 @@ KING_MOVES = [0] * 64
 for square in range(64):
     rank = square // 8
     file = square % 8
-    knight_moves = [
-        (rank + 2, file + 1), (rank + 1, file + 2),
-        (rank - 1, file + 2), (rank - 2, file + 1),
-        (rank - 2, file - 1), (rank - 1, file - 2),
-        (rank + 1, file - 2), (rank + 2, file - 1)
+    knight_offsets = [
+        (2, 1), (1, 2), (-1, 2), (-2, 1),
+        (-2, -1), (-1, -2), (1, -2), (2, -1)
     ]
-    king_moves = [
-        (rank + 1, file), (rank - 1, file),
-        (rank, file + 1), (rank, file - 1),
-        (rank + 1, file + 1), (rank + 1, file - 1),
-        (rank - 1, file + 1), (rank - 1, file - 1)
+    king_offsets = [
+        (1, 0), (-1, 0), (0, 1), (0, -1),
+        (1, 1), (1, -1), (-1, 1), (-1, -1)
     ]
-    for r, f in knight_moves:
+    for dr, df in knight_offsets:
+        r = rank + dr
+        f = file + df
         if 0 <= r < 8 and 0 <= f < 8:
             KNIGHT_MOVES[square] |= 1 << (r * 8 + f)
-    for r, f in king_moves:
+    for dr, df in king_offsets:
+        r = rank + dr
+        f = file + df
         if 0 <= r < 8 and 0 <= f < 8:
             KING_MOVES[square] |= 1 << (r * 8 + f)
 
