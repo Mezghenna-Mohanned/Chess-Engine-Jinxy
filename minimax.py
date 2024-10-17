@@ -10,7 +10,7 @@ def quiescence_search(board, alpha, beta):
         alpha = stand_pat
 
     moves = board.generate_capture_moves()
-    moves = order_moves(moves, board)
+    moves = order_moves(moves)
     for move in moves:
         board.make_move(move)
         score = -quiescence_search(board, -beta, -alpha)
@@ -22,7 +22,7 @@ def quiescence_search(board, alpha, beta):
     return alpha
 
 def minimax(board, depth, alpha, beta, maximizing_player):
-    board_hash = board.zobrist_hash()
+    board_hash = board.zobrist_hash
     tt_entry = transposition_table.get(board_hash)
     if tt_entry and tt_entry['depth'] >= depth:
         if tt_entry['flag'] == 'exact':
@@ -34,14 +34,11 @@ def minimax(board, depth, alpha, beta, maximizing_player):
         if alpha >= beta:
             return tt_entry['value']
 
-    if depth == 0:
+    if depth == 0 or board.is_game_over():
         return quiescence_search(board, alpha, beta)
 
-    if board.is_game_over():
-        return evaluate(board)
-
     moves = board.generate_legal_moves()
-    moves = order_moves(moves, board)
+    moves = order_moves(moves)
     if not moves:
         return evaluate(board)
 
@@ -83,35 +80,41 @@ def minimax(board, depth, alpha, beta, maximizing_player):
 def find_best_move(board, max_depth):
     best_move = None
     best_eval = float('-inf') if board.white_to_move else float('inf')
-    for depth in range(1, max_depth + 1):
-        moves = board.generate_legal_moves()
-        moves = order_moves(moves, board)
-        for move in moves:
-            board.make_move(move)
-            eval = minimax(board, depth - 1, float('-inf'), float('inf'), not board.white_to_move)
-            board.undo_move(move)
-            if board.white_to_move and eval > best_eval:
-                best_eval = eval
-                best_move = move
-            elif not board.white_to_move and eval < best_eval:
-                best_eval = eval
-                best_move = move
+    moves = board.generate_legal_moves()
+    moves = order_moves(moves)
+    for move in moves:
+        board.make_move(move)
+        eval = minimax(board, max_depth - 1, float('-inf'), float('inf'), not board.white_to_move)
+        board.undo_move(move)
+        if board.white_to_move and eval > best_eval:
+            best_eval = eval
+            best_move = move
+        elif not board.white_to_move and eval < best_eval:
+            best_eval = eval
+            best_move = move
     return best_move
 
-def order_moves(moves, board):
+def order_moves(moves):
     captures = []
     quiet_moves = []
     for move in moves:
-        if board.is_capture_move(move):
+        if move.captured_piece:
             captures.append(move)
         else:
             quiet_moves.append(move)
-    captures.sort(key=lambda move: mvv_lva_score(move, board), reverse=True)
+    captures.sort(key=lambda move: mvv_lva_score(move), reverse=True)
     return captures + quiet_moves
 
-def mvv_lva_score(move, board):
-    victim_piece = board.get_piece_at_square(move.to_square)
+def mvv_lva_score(move):
+    victim_piece = move.captured_piece
     attacker_piece = move.piece
-    victim_value = board.get_piece_value(victim_piece)
-    attacker_value = board.get_piece_value(attacker_piece)
+    victim_value = get_piece_value(victim_piece) if victim_piece else 0
+    attacker_value = get_piece_value(attacker_piece)
     return victim_value * 10 - attacker_value
+
+def get_piece_value(piece):
+    piece_values = {
+        'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000,
+        'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
+    }
+    return piece_values.get(piece, 0)

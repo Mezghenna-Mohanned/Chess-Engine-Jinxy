@@ -11,10 +11,48 @@ class Board:
         self.halfmove_clock = 0
         self.fullmove_number = 1
         self.move_history = []
+
         self.update_occupied()
 
-        self.zobrist_keys = self.initialize_zobrist_keys()
-        self.current_zobrist_hash = self.calculate_zobrist_hash()
+        random.seed(0)
+        pieces = ['P', 'N', 'B', 'R', 'Q', 'K',
+                  'p', 'n', 'b', 'r', 'q', 'k']
+
+        self.zobrist_piece_keys = {
+            piece: [random.getrandbits(64) for _ in range(64)] for piece in pieces
+        }
+
+        self.zobrist_castling_keys = {
+            'K': random.getrandbits(64),
+            'Q': random.getrandbits(64),
+            'k': random.getrandbits(64),
+            'q': random.getrandbits(64)
+        }
+
+        self.zobrist_en_passant_keys = [random.getrandbits(64) for _ in range(8)]
+        self.zobrist_side_key = random.getrandbits(64)
+        self.zobrist_hash = self.compute_zobrist_hash()
+
+
+    def compute_zobrist_hash(self):
+        zobrist_hash = 0
+        for piece, bitboard in self.bitboards.items():
+            squares = self.get_squares_from_bitboard(bitboard)
+            for square in squares:
+                zobrist_hash ^= self.zobrist_piece_keys[piece][square]
+
+        for right in ['K', 'Q', 'k', 'q']:
+            if self.castling_rights.get(right, False):
+                zobrist_hash ^= self.zobrist_castling_keys[right]
+
+        if self.en_passant_target is not None:
+            zobrist_hash ^= self.zobrist_en_passant_keys[self.en_passant_target % 8]
+
+        if self.white_to_move:
+            zobrist_hash ^= self.zobrist_side_key
+
+        return zobrist_hash
+
 
     def initialize_zobrist_keys(self):
         random.seed(0)
@@ -56,6 +94,18 @@ class Board:
     def zobrist_hash(self):
         return self.current_zobrist_hash
 
+
+
+    def get_squares_from_bitboard(self, bitboard):
+        squares = []
+        while bitboard:
+            square = (bitboard & -bitboard).bit_length() - 1
+            squares.append(square)
+            bitboard &= bitboard - 1
+        return squares
+
+
+
     def update_occupied(self):
         self.occupied_white = 0
         self.occupied_black = 0
@@ -67,73 +117,72 @@ class Board:
         self.occupied = self.occupied_white | self.occupied_black
 
     def make_move(self, move):
-        state = {
+        self.move_history.append({
             'bitboards': self.bitboards.copy(),
             'white_to_move': self.white_to_move,
             'castling_rights': self.castling_rights.copy(),
             'en_passant_target': self.en_passant_target,
             'halfmove_clock': self.halfmove_clock,
             'fullmove_number': self.fullmove_number,
-        }
-        self.move_history.append(state)
-
-        move.previous_en_passant_target = self.en_passant_target
-        move.previous_castling_rights = self.castling_rights.copy()
-        move.captured_piece = None
-        move.promoted_piece = None
-
-        piece = move.piece
-        from_square = move.from_square
-        to_square = move.to_square
-        promotion = move.promotion
-
-        self.en_passant_target = None
-
-        if piece.upper() == 'P' or self.is_square_occupied_by_opponent(to_square):
+            'zobrist_hash': self.zobrist_hash,
+        })
+        self.zobrist_hash ^= self.zobrist_piece_keys[move.piece][move.from_square]
+        self.zobrist_hash ^= self.zobrist_piece_keys[move.piece][move.to_square]
+        self.bitboards[move.piece] &= ~(1 << move.from_square)
+        self.bitboards[move.piece] |= (1 << move.to_square)
+        if move.captured_piece:
+            self.bitboards[move.captured_piece] &= ~(1 << move.to_square)
+            self.zobrist_hash ^= self.zobrist_piece_keys[move.captured_piece][move.to_square]
             self.halfmove_clock = 0
         else:
             self.halfmove_clock += 1
-
-        self.bitboards[piece] &= ~(1 << from_square)
-
-        captured_piece = self.get_piece_at_square(to_square)
-        if captured_piece:
-            self.bitboards[captured_piece] &= ~(1 << to_square)
-            move.captured_piece = captured_piece
-
-        if piece.upper() == 'P':
-            if to_square == self.en_passant_target:
-                ep_capture_square = to_square + (-8 if piece.isupper() else 8)
-                captured_piece = self.get_piece_at_square(ep_capture_square)
-                if captured_piece:
-                    self.bitboards[captured_piece] &= ~(1 << ep_capture_square)
-                    move.captured_piece = captured_piece
-
-        if promotion:
-            promoted_piece = promotion if piece.isupper() else promotion.lower()
-            self.bitboards[promoted_piece] |= (1 << to_square)
-            move.promoted_piece = promoted_piece
+        if move.promoted_piece:
+            self.bitboards[move.piece] &= ~(1 << move.to_square)
+            self.bitboards[move.promoted_piece] |= (1 << move.to_square)
+            self.zobrist_hash ^= self.zobrist_piece_keys[move.piece][move.to_square]
+            self.zobrist_hash ^= self.zobrist_piece_keys[move.promoted_piece][move.to_square]
+        if move.is_en_passant:
+            capture_square = move.to_square + (-8 if self.white_to_move else 8)
+            captured_pawn = 'P' if self.white_to_move else 'p'
+            self.bitboards[captured_pawn] &= ~(1 << capture_square)
+            self.zobrist_hash ^= self.zobrist_piece_keys[captured_pawn][capture_square]
+        if move.piece.upper() == 'K':
+            if self.castling_rights.get('K', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['K']
+            if self.castling_rights.get('Q', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['Q']
+            self.castling_rights['K'] = False
+            self.castling_rights['Q'] = False
+        elif move.piece.upper() == 'R':
+            if move.from_square == 63 and self.castling_rights.get('K', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['K']
+                self.castling_rights['K'] = False
+            elif move.from_square == 56 and self.castling_rights.get('Q', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['Q']
+                self.castling_rights['Q'] = False
+            elif move.from_square == 7 and self.castling_rights.get('k', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['k']
+                self.castling_rights['k'] = False
+            elif move.from_square == 0 and self.castling_rights.get('q', False):
+                self.zobrist_hash ^= self.zobrist_castling_keys['q']
+                self.castling_rights['q'] = False
+        if self.en_passant_target is not None:
+            self.zobrist_hash ^= self.zobrist_en_passant_keys[self.en_passant_target % 8]
+        if move.piece.upper() == 'P' and abs(move.to_square - move.from_square) == 16:
+            self.en_passant_target = (move.from_square + move.to_square) // 2
+            self.zobrist_hash ^= self.zobrist_en_passant_keys[self.en_passant_target % 8]
         else:
-            self.bitboards[piece] |= (1 << to_square)
-
-        if piece.upper() == 'P' and abs(to_square - from_square) == 16:
-            self.en_passant_target = from_square + (8 if piece.isupper() else -8)
-
-        self.update_castling_rights(piece, from_square, to_square)
-
-        self.update_zobrist_hash(move)
-
+            self.en_passant_target = None
+        self.update_occupied()
+        self.white_to_move = not self.white_to_move
+        self.zobrist_hash ^= self.zobrist_side_key
         if not self.white_to_move:
             self.fullmove_number += 1
 
-        self.white_to_move = not self.white_to_move
-
-        self.update_occupied()
 
     def undo_move(self, move):
         if not self.move_history:
             return
-
         state = self.move_history.pop()
         self.bitboards = state['bitboards']
         self.white_to_move = state['white_to_move']
@@ -141,6 +190,9 @@ class Board:
         self.en_passant_target = state['en_passant_target']
         self.halfmove_clock = state['halfmove_clock']
         self.fullmove_number = state['fullmove_number']
+        self.zobrist_hash = state['zobrist_hash']
+        self.update_occupied()
+
 
         if move.promoted_piece:
             self.bitboards[move.promoted_piece] &= ~(1 << move.to_square)
@@ -220,12 +272,14 @@ class Board:
             return False
         return self.is_square_attacked(king_square, not self.white_to_move)
 
-    def find_king_square(self, white):
-        king_piece = 'K' if white else 'k'
+    def find_king_square(self, is_white):
+        king_piece = 'K' if is_white else 'k'
         king_bitboard = self.bitboards.get(king_piece, 0)
         if king_bitboard:
             return (king_bitboard & -king_bitboard).bit_length() - 1
-        return None
+        else:
+            return None
+
 
     def is_square_attacked(self, square, by_white):
         attacking_moves = []
@@ -454,61 +508,46 @@ class Board:
         to_square = move.to_square
         captured_piece = move.captured_piece
 
-        self.current_zobrist_hash ^= self.zobrist_keys['pieces'][piece][from_square]
-        self.current_zobrist_hash ^= self.zobrist_keys['pieces'][piece][to_square]
-
-        if captured_piece:
-            self.current_zobrist_hash ^= self.zobrist_keys['pieces'][captured_piece][to_square]
-
-        if move.promotion:
-            promoted_piece = move.promoted_piece if move.promoted_piece else (move.promotion if piece.isupper() else move.promotion.lower())
-
-            self.current_zobrist_hash ^= self.zobrist_keys['pieces'][piece][to_square]
-            self.current_zobrist_hash ^= self.zobrist_keys['pieces'][promoted_piece][to_square]
-
-        self.current_zobrist_hash ^= self.zobrist_keys['white_to_move']
-
-        for i, flag in enumerate(['K', 'Q', 'k', 'q']):
-            prev_right = move.previous_castling_rights.get(flag, False)
-            curr_right = self.castling_rights.get(flag, False)
-            if prev_right != curr_right:
-                self.current_zobrist_hash ^= self.zobrist_keys['castling'][i]
-
-        if move.previous_en_passant_target is not None:
-            prev_file = move.previous_en_passant_target % 8
-            self.current_zobrist_hash ^= self.zobrist_keys['en_passant'][prev_file]
-        if self.en_passant_target is not None:
-            curr_file = self.en_passant_target % 8
-            self.current_zobrist_hash ^= self.zobrist_keys['en_passant'][curr_file]
+        if not undo:
+            self.zobrist_hash ^= self.zobrist_piece_keys[piece][from_square]
+            self.zobrist_hash ^= self.zobrist_piece_keys[piece][to_square]
+            if captured_piece:
+                self.zobrist_hash ^= self.zobrist_piece_keys[captured_piece][to_square]
+        else:
+            if captured_piece:
+                self.zobrist_hash ^= self.zobrist_piece_keys[captured_piece][to_square]
+            self.zobrist_hash ^= self.zobrist_piece_keys[piece][to_square]
+            self.zobrist_hash ^= self.zobrist_piece_keys[piece][from_square]
 
     def evaluate(self):
         return evaluate(self)
 
 class Move:
-    def __init__(self, piece, from_square, to_square, promotion=None, captured_piece=None, previous_en_passant_target=None, previous_castling_rights=None):
+    def __init__(self, piece, from_square, to_square, captured_piece=None, promoted_piece=None, is_en_passant=False, is_castling=False):
         self.piece = piece
         self.from_square = from_square
         self.to_square = to_square
-        self.promotion = promotion
         self.captured_piece = captured_piece
-        self.previous_en_passant_target = previous_en_passant_target
-        self.previous_castling_rights = previous_castling_rights
-        self.promoted_piece = None
+        self.promoted_piece = promoted_piece
+        self.is_en_passant = is_en_passant
+        self.is_castling = is_castling
 
     def __eq__(self, other):
         return (self.piece == other.piece and
                 self.from_square == other.from_square and
                 self.to_square == other.to_square and
-                self.promotion == other.promotion)
+                self.promoted_piece == other.promoted_piece)
 
     def __hash__(self):
-        return hash((self.piece, self.from_square, self.to_square, self.promotion))
+        return hash((self.piece, self.from_square, self.to_square, self.promoted_piece))
 
     def __repr__(self):
         move_str = f"{self.piece}{square_to_algebraic(self.from_square)}{square_to_algebraic(self.to_square)}"
-        if self.promotion:
-            move_str += f"={self.promotion}"
+        if self.promoted_piece:
+            move_str += f"={self.promoted_piece}"
         return move_str
+
+
 
 def square_to_algebraic(square):
     files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']

@@ -43,42 +43,46 @@ def generate_piece_moves(board, piece, from_square):
     else:
         return []
 
-def generate_pawn_moves(board, pawn_piece):
+def generate_pawn_moves(self, piece, from_square, attacks_only=False):
     moves = []
-    is_white = pawn_piece.isupper()
-    pawns = board.bitboards.get(pawn_piece, 0)
-    empty_squares = ~board.occupied & 0xFFFFFFFFFFFFFFFF
+    direction = 8 if piece.isupper() else -8
+    start_rank = 1 if piece.isupper() else 6
+    enemy_pieces = self.occupied_black if piece.isupper() else self.occupied_white
+    own_pieces = self.occupied_white if piece.isupper() else self.occupied_black
+    promotion_rank = 7 if piece.isupper() else 0
 
-    if is_white:
-        one_step = (pawns << 8) & empty_squares
-        promotion_moves = one_step & RANK_MASKS[7]
-        one_step &= ~RANK_MASKS[7]
-        two_step = ((pawns & RANK_MASKS[1]) << 16) & empty_squares & (empty_squares << 8)
-        captures_left = (pawns << 7) & board.occupied_black & ~FILE_MASKS[7]
-        captures_right = (pawns << 9) & board.occupied_black & ~FILE_MASKS[0]
-        en_passant_left = (pawns << 7) & (1 << board.en_passant_target) if board.en_passant_target else 0
-        en_passant_right = (pawns << 9) & (1 << board.en_passant_target) if board.en_passant_target else 0
-    else:
-        one_step = (pawns >> 8) & empty_squares
-        promotion_moves = one_step & RANK_MASKS[0]
-        one_step &= ~RANK_MASKS[0]
-        two_step = ((pawns & RANK_MASKS[6]) >> 16) & empty_squares & (empty_squares >> 8)
-        captures_left = (pawns >> 9) & board.occupied_white & ~FILE_MASKS[0]
-        captures_right = (pawns >> 7) & board.occupied_white & ~FILE_MASKS[7]
-        en_passant_left = (pawns >> 9) & (1 << board.en_passant_target) if board.en_passant_target else 0
-        en_passant_right = (pawns >> 7) & (1 << board.en_passant_target) if board.en_passant_target else 0
+    for capture_direction in [-1, 1]:
+        to_square = from_square + direction + capture_direction
+        if 0 <= to_square < 64 and abs((from_square % 8) - (to_square % 8)) == 1:
+            if (enemy_pieces & (1 << to_square)) or (self.en_passant_target == to_square):
+                captured_piece = self.get_piece_at_square(to_square) if (enemy_pieces & (1 << to_square)) else ('p' if piece.isupper() else 'P')
+                if to_square // 8 == promotion_rank:
+                    for promotion_piece in ['Q', 'R', 'B', 'N']:
+                        prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
+                        moves.append(Move(piece, from_square, to_square, captured_piece, promoted_piece=prom_piece))
+                else:
+                    moves.append(Move(piece, from_square, to_square, captured_piece))
+            elif attacks_only:
+                moves.append(Move(piece, from_square, to_square))
 
-    moves.extend(create_pawn_moves(pawn_piece, one_step, 8, is_double=False, promotion=False))
-    moves.extend(create_pawn_moves(pawn_piece, two_step, 16, is_double=True, promotion=False))
-    moves.extend(create_pawn_captures(pawn_piece, captures_left, 7, promotion=False))
-    moves.extend(create_pawn_captures(pawn_piece, captures_right, 9, promotion=False))
-    moves.extend(create_pawn_moves(pawn_piece, promotion_moves, 8, is_double=False, promotion=True))
-    moves.extend(create_pawn_captures(pawn_piece, captures_left & RANK_MASKS[7 if is_white else 0], 7, promotion=True))
-    moves.extend(create_pawn_captures(pawn_piece, captures_right & RANK_MASKS[7 if is_white else 0], 9, promotion=True))
-    moves.extend(create_pawn_captures(pawn_piece, en_passant_left, 7, en_passant=True))
-    moves.extend(create_pawn_captures(pawn_piece, en_passant_right, 9, en_passant=True))
+    if attacks_only:
+        return moves
+
+    to_square = from_square + direction
+    if 0 <= to_square < 64 and not (self.occupied & (1 << to_square)):
+        if to_square // 8 == promotion_rank:
+            for promotion_piece in ['Q', 'R', 'B', 'N']:
+                prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
+                moves.append(Move(piece, from_square, to_square, promoted_piece=prom_piece))
+        else:
+            moves.append(Move(piece, from_square, to_square))
+        if from_square // 8 == start_rank:
+            to_square2 = from_square + 2 * direction
+            if not (self.occupied & (1 << to_square2)):
+                moves.append(Move(piece, from_square, to_square2))
 
     return moves
+
 
 def create_pawn_moves(pawn_piece, bitboard, shift, is_double=False, promotion=False):
     moves = []
