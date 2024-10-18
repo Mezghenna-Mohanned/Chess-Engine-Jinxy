@@ -1,11 +1,20 @@
 from evaluation import evaluate
+from multiprocessing import Pool, cpu_count
+import time
 
+# Fixed-size transposition table to limit memory usage
+TT_SIZE = 1000000
 transposition_table = {}
 
-def quiescence_search(board, alpha, beta):
-    if board.is_game_over():
-        return evaluate(board)
-    stand_pat = evaluate(board)
+def quiescence_search(board, alpha, beta, color):
+    # Save the current white_to_move
+    original_white_to_move = board.white_to_move
+
+    stand_pat = color * evaluate(board)
+
+    # Restore the white_to_move
+    board.white_to_move = original_white_to_move
+
     if stand_pat >= beta:
         return beta
     if alpha < stand_pat:
@@ -13,12 +22,10 @@ def quiescence_search(board, alpha, beta):
 
     moves = board.generate_capture_moves()
     moves = order_moves(moves)
+
     for move in moves:
         board.make_move(move)
-        if board.is_game_over():
-            score = evaluate(board)
-        else:
-            score = -quiescence_search(board, -beta, -alpha)
+        score = -quiescence_search(board, -beta, -alpha, -color)
         board.undo_move(move)
         if score >= beta:
             return beta
@@ -26,7 +33,10 @@ def quiescence_search(board, alpha, beta):
             alpha = score
     return alpha
 
-def minimax(board, depth, alpha, beta, maximizing_player):
+def negamax(board, depth, alpha, beta, color):
+    alpha_orig = alpha
+
+    # Transposition Table Lookup
     board_hash = board.zobrist_hash
     tt_entry = transposition_table.get(board_hash)
     if tt_entry and tt_entry['depth'] >= depth:
@@ -40,86 +50,84 @@ def minimax(board, depth, alpha, beta, maximizing_player):
             return tt_entry['value']
 
     if depth == 0 or board.is_game_over():
-        return quiescence_search(board, alpha, beta)
+        # Save the current white_to_move
+        original_white_to_move = board.white_to_move
 
+        value = quiescence_search(board, alpha, beta, color)
+
+        # Restore the white_to_move
+        board.white_to_move = original_white_to_move
+
+        return value
+
+    max_eval = float('-inf')
     moves = board.generate_legal_moves()
-    moves = order_moves(moves)
     if not moves:
-        return evaluate(board)
+        return color * evaluate(board)
 
-    if maximizing_player:
-        max_eval = float('-inf')
-        for move in moves:
-            board.make_move(move)
-            eval = minimax(board, depth - 1, alpha, beta, False)
-            board.undo_move(move)
-            max_eval = max(max_eval, eval)
-            alpha = max(alpha, eval)
-            if beta <= alpha:
-                break
-        flag = 'exact'
-        if max_eval <= alpha:
-            flag = 'upperbound'
-        elif max_eval >= beta:
-            flag = 'lowerbound'
-        else:
-            flag = 'exact'
-        transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
-        return max_eval
-    else:
-        min_eval = float('inf')
-        for move in moves:
-            board.make_move(move)
-            eval = minimax(board, depth - 1, alpha, beta, True)
-            board.undo_move(move)
-            min_eval = min(min_eval, eval)
-            beta = min(beta, eval)
-            if beta <= alpha:
-                break
-        flag = 'exact'
-        if min_eval <= alpha:
-            flag = 'upperbound'
-        elif min_eval >= beta:
-            flag = 'lowerbound'
-        else:
-            flag = 'exact'
-        transposition_table[board_hash] = {'value': min_eval, 'depth': depth, 'flag': flag}
-        return min_eval
+    moves = order_moves(moves)
+
+    for move in moves:
+        board.make_move(move)
+        eval = -negamax(board, depth - 1, -beta, -alpha, -color)
+        board.undo_move(move)
+        max_eval = max(max_eval, eval)
+        alpha = max(alpha, eval)
+        if alpha >= beta:
+            break
+
+    flag = 'exact'
+    if max_eval <= alpha_orig:
+        flag = 'upperbound'
+    elif max_eval >= beta:
+        flag = 'lowerbound'
+
+    if len(transposition_table) > TT_SIZE:
+        # Simple replacement strategy: remove a random item
+        transposition_table.pop(next(iter(transposition_table)))
+    transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
+
+    return max_eval
 
 def find_best_move(board, max_depth):
     best_move = None
-    best_eval = float('-inf') if board.white_to_move else float('inf')
+    best_eval = float('-inf')
+    color = 1 if board.white_to_move else -1
     moves = board.generate_legal_moves()
+    if not moves:
+        return None
     moves = order_moves(moves)
-    for move in moves:
-        board.make_move(move)
-        eval = minimax(board, max_depth - 1, float('-inf'), float('inf'), not board.white_to_move)
-        board.undo_move(move)
-        if board.white_to_move and eval > best_eval:
-            best_eval = eval
-            best_move = move
-        elif not board.white_to_move and eval < best_eval:
-            best_eval = eval
-            best_move = move
+
+    # Iterative Deepening
+    for depth in range(1, max_depth + 1):
+        current_best_eval = float('-inf')
+        current_best_move = None
+        for move in moves:
+            board.make_move(move)
+            eval = -negamax(board, depth - 1, float('-inf'), float('inf'), -color)
+            board.undo_move(move)
+            if eval > current_best_eval:
+                current_best_eval = eval
+                current_best_move = move
+        best_eval = current_best_eval
+        best_move = current_best_move
+        # Re-order moves based on previous search to improve move ordering
+        moves.sort(key=lambda m: move_ordering_score(board, m), reverse=True)
     return best_move
 
 def order_moves(moves):
-    captures = []
-    quiet_moves = []
-    for move in moves:
-        if move.captured_piece:
-            captures.append(move)
-        else:
-            quiet_moves.append(move)
-    captures.sort(key=lambda move: mvv_lva_score(move), reverse=True)
-    return captures + quiet_moves
+    # Order moves to improve alpha-beta pruning efficiency
+    moves.sort(key=lambda move: move_ordering_score(None, move), reverse=True)
+    return moves
 
-def mvv_lva_score(move):
-    victim_piece = move.captured_piece
-    attacker_piece = move.piece
-    victim_value = get_piece_value(victim_piece) if victim_piece else 0
-    attacker_value = get_piece_value(attacker_piece)
-    return victim_value * 10 - attacker_value
+def move_ordering_score(board, move):
+    score = 0
+    if move.captured_piece:
+        # Most Valuable Victim - Least Valuable Attacker (MVV-LVA)
+        score += 10 * get_piece_value(move.captured_piece) - get_piece_value(move.piece)
+    if move.promoted_piece:
+        score += get_piece_value(move.promoted_piece)
+    return score
 
 def get_piece_value(piece):
     piece_values = {
