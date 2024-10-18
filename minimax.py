@@ -2,17 +2,14 @@ from evaluation import evaluate
 from multiprocessing import Pool, cpu_count
 import time
 
-# Fixed-size transposition table to limit memory usage
 TT_SIZE = 1000000
 transposition_table = {}
 
 def quiescence_search(board, alpha, beta, color):
-    # Save the current white_to_move
     original_white_to_move = board.white_to_move
 
     stand_pat = color * evaluate(board)
 
-    # Restore the white_to_move
     board.white_to_move = original_white_to_move
 
     if stand_pat >= beta:
@@ -36,7 +33,6 @@ def quiescence_search(board, alpha, beta, color):
 def negamax(board, depth, alpha, beta, color):
     alpha_orig = alpha
 
-    # Transposition Table Lookup
     board_hash = board.zobrist_hash
     tt_entry = transposition_table.get(board_hash)
     if tt_entry and tt_entry['depth'] >= depth:
@@ -50,12 +46,10 @@ def negamax(board, depth, alpha, beta, color):
             return tt_entry['value']
 
     if depth == 0 or board.is_game_over():
-        # Save the current white_to_move
         original_white_to_move = board.white_to_move
 
         value = quiescence_search(board, alpha, beta, color)
 
-        # Restore the white_to_move
         board.white_to_move = original_white_to_move
 
         return value
@@ -83,7 +77,6 @@ def negamax(board, depth, alpha, beta, color):
         flag = 'lowerbound'
 
     if len(transposition_table) > TT_SIZE:
-        # Simple replacement strategy: remove a random item
         transposition_table.pop(next(iter(transposition_table)))
     transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
 
@@ -98,7 +91,6 @@ def find_best_move(board, max_depth):
         return None
     moves = order_moves(moves)
 
-    # Iterative Deepening
     for depth in range(1, max_depth + 1):
         current_best_eval = float('-inf')
         current_best_move = None
@@ -111,19 +103,16 @@ def find_best_move(board, max_depth):
                 current_best_move = move
         best_eval = current_best_eval
         best_move = current_best_move
-        # Re-order moves based on previous search to improve move ordering
         moves.sort(key=lambda m: move_ordering_score(board, m), reverse=True)
     return best_move
 
 def order_moves(moves):
-    # Order moves to improve alpha-beta pruning efficiency
     moves.sort(key=lambda move: move_ordering_score(None, move), reverse=True)
     return moves
 
 def move_ordering_score(board, move):
     score = 0
     if move.captured_piece:
-        # Most Valuable Victim - Least Valuable Attacker (MVV-LVA)
         score += 10 * get_piece_value(move.captured_piece) - get_piece_value(move.piece)
     if move.promoted_piece:
         score += get_piece_value(move.promoted_piece)

@@ -2,8 +2,6 @@ import numpy as np
 from functools import lru_cache
 from constants import PIECE_VALUES, POSITIONAL_VALUES, FILE_MASKS
 
-# Replace [...] with actual positional values for each piece.
-# These should be 64-element numpy arrays representing the value of a piece on each square.
 PIECE_SQUARE_TABLES = {
     'P': np.array([
          0,   0,   0,   0,   0,   0,   0,   0,
@@ -94,22 +92,25 @@ def evaluate(board):
 
     for piece in own_pieces + enemy_pieces:
         bitboard = board.bitboards.get(piece, 0)
-        piece_value = PIECE_VALUES[piece]
+        piece_value = PIECE_VALUES.get(piece.upper(), 0)
         if bitboard:
-            squares = np.array([i for i in range(64) if bitboard & (1 << i)])
+            squares = [i for i in range(64) if bitboard & (1 << i)]
             material_score += piece_value * len(squares)
-            if piece.upper() in POSITIONAL_VALUES:
-                table = np.array(POSITIONAL_VALUES[piece.upper()])
+            if piece.upper() in PIECE_SQUARE_TABLES:
+                table = PIECE_SQUARE_TABLES[piece.upper()]
+                squares_np = np.array(squares)
                 if piece.isupper():
-                    positional_values = table[squares]
+                    positional_values = table[squares_np]
                 else:
-                    positional_values = -table[63 - squares]
+                    positional_values = -table[63 - squares_np]
                 positional_score += np.sum(positional_values)
             if piece.upper() in ('N', 'B'):
                 piece_counts[piece] += len(squares)
             if piece.upper() == 'Q':
-                queen_mobility_score += evaluate_mobility(board, piece, squares)
-            mobility_score += evaluate_mobility(board, piece, squares)
+                queen_mobility_score = evaluate_mobility(board, piece, squares)
+                mobility_score += queen_mobility_score
+            else:
+                mobility_score += evaluate_mobility(board, piece, squares)
             space_score += evaluate_space(piece, squares)
     if piece_counts['B'] >= 2:
         bishop_pair_score += 50
@@ -163,7 +164,7 @@ def get_game_phase(board):
     total_material = 0
     for piece, bitboard in board.bitboards.items():
         if piece.upper() != 'K':
-            piece_value = abs(PIECE_VALUES[piece])
+            piece_value = abs(PIECE_VALUES.get(piece.upper(), 0))
             total_material += piece_value * bin(bitboard).count('1')
     if total_material > 32000:
         return 'opening'
@@ -181,7 +182,7 @@ def evaluate_mobility(board, piece, squares):
 
 def evaluate_space(piece, squares):
     score = 0
-    ranks = squares // 8
+    ranks = np.array(squares) // 8
     if piece.isupper():
         score += np.sum(ranks >= 4) * 5
     else:
@@ -232,8 +233,8 @@ def evaluate_open_files_to_king(board, king_square, is_white):
     file = king_square % 8
     enemy_rooks_queens = board.bitboards.get('r' if is_white else 'R', 0) | board.bitboards.get('q' if is_white else 'Q', 0)
     if is_file_open(board, file):
-        enemy_pieces = np.array([i for i in range(64) if enemy_rooks_queens & (1 << i)])
-        if any(enemy_pieces % 8 == file):
+        enemy_pieces = [i for i in range(64) if enemy_rooks_queens & (1 << i)]
+        if any(sq % 8 == file for sq in enemy_pieces):
             score += 30
     return score
 
@@ -260,15 +261,16 @@ def evaluate_pawn_structure(board):
 
 def evaluate_pawn_weaknesses(board, pawns):
     score = 0
-    files = np.array([i % 8 for i in range(64) if pawns & (1 << i)])
-    unique_files, counts = np.unique(files, return_counts=True)
-    doubled_pawns = counts - 1
-    score -= np.sum(doubled_pawns * 30)
-    for file in unique_files:
+    files = [i % 8 for i in range(64) if pawns & (1 << i)]
+    unique_files = set(files)
+    counts = {f: files.count(f) for f in unique_files}
+    for file, count in counts.items():
+        doubled_pawns = count - 1
+        score -= doubled_pawns * 30
         is_isolated = True
-        if file > 0 and pawns & FILE_MASKS[file - 1]:
+        if file > 0 and any(f == file - 1 for f in unique_files):
             is_isolated = False
-        if file < 7 and pawns & FILE_MASKS[file + 1]:
+        if file < 7 and any(f == file + 1 for f in unique_files):
             is_isolated = False
         if is_isolated:
             score -= 25
@@ -287,13 +289,13 @@ def evaluate_pawn_islands(pawns):
 
 def evaluate_center_control(board):
     score = 0
-    central_squares = np.array([18, 19, 20, 21, 26, 27, 28, 29, 34, 35, 36, 37, 42, 43, 44, 45])
+    central_squares = [18, 19, 20, 21, 26, 27, 28, 29, 34, 35, 36, 37, 42, 43, 44, 45]
     own_pieces = 'PNBRQK' if board.white_to_move else 'pnbrqk'
     piece_values = {'P': 10, 'N': 30, 'B': 30, 'R': 50, 'Q': 90}
     for piece in own_pieces:
         bitboard = board.bitboards.get(piece, 0)
         if bitboard:
-            squares = np.array([i for i in range(64) if bitboard & (1 << i)])
+            squares = [i for i in range(64) if bitboard & (1 << i)]
             for square in squares:
                 attacks = board.generate_piece_moves(piece, square, attacks_only=True)
                 for move in attacks:
@@ -307,7 +309,7 @@ def evaluate_piece_coordination(board):
     for piece in own_pieces:
         bitboard = board.bitboards.get(piece, 0)
         if bitboard:
-            squares = np.array([i for i in range(64) if bitboard & (1 << i)])
+            squares = [i for i in range(64) if bitboard & (1 << i)]
             for from_square in squares:
                 attacks = board.generate_piece_moves(piece, from_square, attacks_only=True)
                 for move in attacks:
@@ -370,8 +372,8 @@ def evaluate_threats(board, own_moves):
     score = 0
     for move in own_moves:
         if board.is_capture_move(move):
-            captured_value = abs(PIECE_VALUES[move.captured_piece])
-            attacker_value = abs(PIECE_VALUES[move.piece])
+            captured_value = abs(PIECE_VALUES.get(move.captured_piece.upper(), 0))
+            attacker_value = abs(PIECE_VALUES.get(move.piece.upper(), 0))
             trade_gain = captured_value - attacker_value
             score += trade_gain
         elif is_threatening_move(board, move):
@@ -447,7 +449,7 @@ def evaluate_exchanges(board):
             attackers = get_attackers(board, square, not board.white_to_move)
             if attackers:
                 defenders = get_attackers(board, square, board.white_to_move)
-                piece_value = abs(PIECE_VALUES[piece])
+                piece_value = abs(PIECE_VALUES.get(piece.upper(), 0))
                 if not defenders:
                     score -= piece_value
                 else:
@@ -465,7 +467,7 @@ def get_attackers(board, square, by_white):
             for from_square in from_squares:
                 attacks = board.generate_piece_moves(piece, from_square, attacks_only=True)
                 if any(move.to_square == square for move in attacks):
-                    attackers.append({'piece': piece, 'from_square': from_square, 'value': abs(PIECE_VALUES[piece])})
+                    attackers.append({'piece': piece, 'from_square': from_square, 'value': abs(PIECE_VALUES.get(piece.upper(), 0))})
     return attackers
 
 def static_exchange_evaluation(board, piece_value, attackers, defenders):

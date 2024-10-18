@@ -52,132 +52,14 @@ class Board:
 
         return zobrist_hash
 
-
-    def initialize_zobrist_keys(self):
-        random.seed(0)
-        zobrist_keys = {}
-        pieces = ['P', 'N', 'B', 'R', 'Q', 'K',
-                  'p', 'n', 'b', 'r', 'q', 'k']
-        zobrist_keys['pieces'] = {
-            piece: [random.getrandbits(64) for _ in range(64)] for piece in pieces
-        }
-        zobrist_keys['castling'] = [random.getrandbits(64) for _ in range(4)]
-        zobrist_keys['en_passant'] = [random.getrandbits(64) for _ in range(8)]
-        zobrist_keys['white_to_move'] = random.getrandbits(64)
-        return zobrist_keys
-
-    def calculate_zobrist_hash(self):
-        h = 0
-
-        for piece, bitboard in self.bitboards.items():
-            bb = bitboard
-            while bb:
-                square = (bb & -bb).bit_length() - 1
-                h ^= self.zobrist_keys['pieces'][piece][square]
-                bb &= bb - 1
-
-        if self.white_to_move:
-            h ^= self.zobrist_keys['white_to_move']
-
-        castling_flags = ['K', 'Q', 'k', 'q']
-        for i, flag in enumerate(castling_flags):
-            if self.castling_rights.get(flag, False):
-                h ^= self.zobrist_keys['castling'][i]
-
-        if self.en_passant_target is not None:
-            file = self.en_passant_target % 8
-            h ^= self.zobrist_keys['en_passant'][file]
-
-        return h
-
-    def zobrist_hash(self):
-        return self.current_zobrist_hash
-
-    def can_castle_kingside_white(self):
-        if not self.castling_rights.get('K', False):
-            return False
-        # Squares between king and rook are empty: f1 (square 5), g1 (square 6)
-        if self.occupied & (1 << 5) or self.occupied & (1 << 6):
-            return False
-        # King is not in check
-        if self.is_in_check():
-            return False
-        # Squares the king passes through are not attacked: f1 (5), g1 (6)
-        if self.is_square_attacked(5, by_white=False) or self.is_square_attacked(6, by_white=False):
-            return False
-        # King and rook are on their original squares
-        if not (self.bitboards.get('K', 0) & (1 << 4)):
-            return False
-        if not (self.bitboards.get('R', 0) & (1 << 7)):
-            return False
-        return True
-
-    def can_castle_queenside_white(self):
-        if not self.castling_rights.get('Q', False):
-            return False
-        # Squares between king and rook are empty: b1 (1), c1 (2), d1 (3)
-        if self.occupied & (1 << 1) or self.occupied & (1 << 2) or self.occupied & (1 << 3):
-            return False
-        # King is not in check
-        if self.is_in_check():
-            return False
-        # Squares the king passes through are not attacked: d1 (3), c1 (2)
-        if self.is_square_attacked(3, by_white=False) or self.is_square_attacked(2, by_white=False):
-            return False
-        # King and rook are on their original squares
-        if not (self.bitboards.get('K', 0) & (1 << 4)):
-            return False
-        if not (self.bitboards.get('R', 0) & (1 << 0)):
-            return False
-        return True
-
-    def can_castle_kingside_black(self):
-        if not self.castling_rights.get('k', False):
-            return False
-        # Squares between king and rook are empty: f8 (61), g8 (62)
-        if self.occupied & (1 << 61) or self.occupied & (1 << 62):
-            return False
-        # King is not in check
-        if self.is_in_check():
-            return False
-        # Squares the king passes through are not attacked: f8 (61), g8 (62)
-        if self.is_square_attacked(61, by_white=True) or self.is_square_attacked(62, by_white=True):
-            return False
-        # King and rook are on their original squares
-        if not (self.bitboards.get('k', 0) & (1 << 60)):
-            return False
-        if not (self.bitboards.get('r', 0) & (1 << 63)):
-            return False
-        return True
-
-    def can_castle_queenside_black(self):
-        if not self.castling_rights.get('q', False):
-            return False
-        # Squares between king and rook are empty: b8 (57), c8 (58), d8 (59)
-        if self.occupied & (1 << 57) or self.occupied & (1 << 58) or self.occupied & (1 << 59):
-            return False
-        # King is not in check
-        if self.is_in_check():
-            return False
-        # Squares the king passes through are not attacked: d8 (59), c8 (58)
-        if self.is_square_attacked(59, by_white=True) or self.is_square_attacked(58, by_white=True):
-            return False
-        # King and rook are on their original squares
-        if not (self.bitboards.get('k', 0) & (1 << 60)):
-            return False
-        if not (self.bitboards.get('r', 0) & (1 << 56)):
-            return False
-        return True
-
-
     def get_squares_from_bitboard(self, bitboard):
-        squares = []
-        while bitboard:
-            square = (bitboard & -bitboard).bit_length() - 1
-            squares.append(square)
-            bitboard &= bitboard - 1
-        return squares
-
+            squares = []
+            while bitboard:
+                lsb = bitboard & -bitboard
+                square = (lsb).bit_length() - 1
+                squares.append(square)
+                bitboard &= bitboard - 1
+            return squares
 
 
     def update_occupied(self):
@@ -202,28 +84,24 @@ class Board:
             'zobrist_hash': self.zobrist_hash,
         })
 
-        # Update Zobrist hash for side to move
         self.zobrist_hash ^= self.zobrist_side_key
 
         piece = move.piece
         from_square = move.from_square
         to_square = move.to_square
 
-        # Remove piece from from_square
         self.bitboards[piece] &= ~(1 << from_square)
         self.zobrist_hash ^= self.zobrist_piece_keys[piece][from_square]
 
         captured_piece = self.get_piece_at_square(to_square) if self.occupied & (1 << to_square) else None
 
         if captured_piece:
-            # Remove captured piece
             self.bitboards[captured_piece] &= ~(1 << to_square)
             self.zobrist_hash ^= self.zobrist_piece_keys[captured_piece][to_square]
             self.halfmove_clock = 0
         else:
             self.halfmove_clock += 1
 
-        # Place piece on to_square
         if move.promoted_piece:
             promoted_piece = move.promoted_piece
             self.bitboards[promoted_piece] |= (1 << to_square)
@@ -232,76 +110,59 @@ class Board:
             self.bitboards[piece] |= (1 << to_square)
             self.zobrist_hash ^= self.zobrist_piece_keys[piece][to_square]
 
-        # Handle en passant capture
         if move.is_en_passant:
             ep_capture_square = to_square + (8 if self.white_to_move else -8)
             captured_pawn = 'p' if self.white_to_move else 'P'
             self.bitboards[captured_pawn] &= ~(1 << ep_capture_square)
             self.zobrist_hash ^= self.zobrist_piece_keys[captured_pawn][ep_capture_square]
-            captured_piece = captured_pawn  # For halfmove clock reset
+            captured_piece = captured_pawn
             self.halfmove_clock = 0
 
-        # Handle castling
         if move.is_castling:
-            if to_square == 6:  # White kingside
-                # Move rook from h1 (7) to f1 (5)
+            if to_square == 6:
                 self.bitboards['R'] &= ~(1 << 7)
                 self.bitboards['R'] |= (1 << 5)
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][7]
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][5]
-            elif to_square == 2:  # White queenside
-                # Move rook from a1 (0) to d1 (3)
+            elif to_square == 2:
                 self.bitboards['R'] &= ~(1 << 0)
                 self.bitboards['R'] |= (1 << 3)
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][0]
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][3]
-            elif to_square == 62:  # Black kingside
-                # Move rook from h8 (63) to f8 (61)
+            elif to_square == 62:
                 self.bitboards['r'] &= ~(1 << 63)
                 self.bitboards['r'] |= (1 << 61)
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][63]
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][61]
-            elif to_square == 58:  # Black queenside
-                # Move rook from a8 (56) to d8 (59)
+            elif to_square == 58:
                 self.bitboards['r'] &= ~(1 << 56)
                 self.bitboards['r'] |= (1 << 59)
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][56]
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][59]
 
-        # Update castling rights
         self.update_castling_rights(piece, from_square, to_square)
 
-        # Update en passant target
         if self.en_passant_target is not None:
-            # Remove old en passant file from Zobrist hash
             self.zobrist_hash ^= self.zobrist_en_passant_keys[self.en_passant_target % 8]
             self.en_passant_target = None
 
         if piece.upper() == 'P' and abs(to_square - from_square) == 16:
-            # Set new en passant target square
             self.en_passant_target = (from_square + to_square) // 2
             self.zobrist_hash ^= self.zobrist_en_passant_keys[self.en_passant_target % 8]
 
-        # Update halfmove clock
         if piece.upper() == 'P' or captured_piece:
             self.halfmove_clock = 0
 
-        # Update fullmove number
         if not self.white_to_move:
             self.fullmove_number += 1
 
-        # Update occupancy bitboards
         self.update_occupied()
 
-        # Switch side to move
         self.white_to_move = not self.white_to_move
-
-
 
     def undo_move(self, move):
         if not self.move_history:
             return
-        # Restore the previous state
         state = self.move_history.pop()
         self.bitboards = state['bitboards']
         self.white_to_move = state['white_to_move']
@@ -313,22 +174,6 @@ class Board:
 
         self.update_occupied()
 
-
-        if move.promoted_piece:
-            self.bitboards[move.promoted_piece] &= ~(1 << move.to_square)
-            original_piece = move.piece
-            self.bitboards[original_piece] |= (1 << move.from_square)
-
-        if move.captured_piece:
-            self.bitboards[move.captured_piece] |= (1 << move.to_square)
-            if move.piece.upper() == 'P' and move.to_square == self.en_passant_target:
-                ep_capture_square = move.to_square + (-8 if move.piece.isupper() else 8)
-                self.bitboards[move.captured_piece] |= (1 << ep_capture_square)
-
-        self.update_occupied()
-
-        self.update_zobrist_hash(move, undo=True)
-
     def update_castling_rights(self, piece, from_square, to_square):
         if piece == 'K':
             self.castling_rights['K'] = False
@@ -336,7 +181,6 @@ class Board:
         elif piece == 'k':
             self.castling_rights['k'] = False
             self.castling_rights['q'] = False
-
         elif piece == 'R':
             if from_square == 0:
                 self.castling_rights['Q'] = False
@@ -400,7 +244,6 @@ class Board:
         else:
             return None
 
-
     def is_square_attacked(self, square, by_white):
         attacking_moves = []
         if by_white:
@@ -409,7 +252,9 @@ class Board:
                 while bitboard:
                     from_square = (bitboard & -bitboard).bit_length() - 1
                     moves = self.generate_piece_moves(piece, from_square, attacks_only=True)
-                    attacking_moves.extend(moves)
+                    for move in moves:
+                        if move.to_square == square:
+                            return True
                     bitboard &= bitboard - 1
         else:
             for piece in 'pnbrqk':
@@ -417,15 +262,15 @@ class Board:
                 while bitboard:
                     from_square = (bitboard & -bitboard).bit_length() - 1
                     moves = self.generate_piece_moves(piece, from_square, attacks_only=True)
-                    attacking_moves.extend(moves)
+                    for move in moves:
+                        if move.to_square == square:
+                            return True
                     bitboard &= bitboard - 1
-        for move in attacking_moves:
-            if move.to_square == square:
-                return True
         return False
 
     def generate_piece_moves(self, piece, from_square, attacks_only=False):
         moves = []
+        from_square = int(from_square)
         if piece.upper() == 'P':
             moves.extend(self._generate_pawn_moves(piece, from_square, attacks_only))
         elif piece.upper() == 'N':
