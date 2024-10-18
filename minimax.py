@@ -3,6 +3,8 @@ from evaluation import evaluate
 transposition_table = {}
 
 def quiescence_search(board, alpha, beta):
+    if board.is_game_over():
+        return evaluate(board)
     stand_pat = evaluate(board)
     if stand_pat >= beta:
         return beta
@@ -13,7 +15,10 @@ def quiescence_search(board, alpha, beta):
     moves = order_moves(moves)
     for move in moves:
         board.make_move(move)
-        score = -quiescence_search(board, -beta, -alpha)
+        if board.is_game_over():
+            score = evaluate(board)
+        else:
+            score = -quiescence_search(board, -beta, -alpha)
         board.undo_move(move)
         if score >= beta:
             return beta
@@ -57,6 +62,8 @@ def minimax(board, depth, alpha, beta, maximizing_player):
             flag = 'upperbound'
         elif max_eval >= beta:
             flag = 'lowerbound'
+        else:
+            flag = 'exact'
         transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
         return max_eval
     else:
@@ -74,6 +81,8 @@ def minimax(board, depth, alpha, beta, maximizing_player):
             flag = 'upperbound'
         elif min_eval >= beta:
             flag = 'lowerbound'
+        else:
+            flag = 'exact'
         transposition_table[board_hash] = {'value': min_eval, 'depth': depth, 'flag': flag}
         return min_eval
 

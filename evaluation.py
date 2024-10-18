@@ -470,6 +470,8 @@ def evaluate_endgame(board):
     return score
 
 def manhattan_distance(sq1, sq2):
+    if sq1 is None or sq2 is None:
+        return 0  # Or some large value indicating maximum distance
     rank1, file1 = divmod(sq1, 8)
     rank2, file2 = divmod(sq2, 8)
     return abs(rank1 - rank2) + abs(file1 - file2)

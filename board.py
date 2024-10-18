@@ -356,28 +356,31 @@ class Board:
         own_pieces = self.occupied_white if piece.isupper() else self.occupied_black
         promotion_rank = 7 if piece.isupper() else 0
 
+        # Capture moves
         for capture_direction in [-1, 1]:
             to_square = from_square + direction + capture_direction
             if 0 <= to_square < 64 and abs((from_square % 8) - (to_square % 8)) == 1:
                 if (enemy_pieces & (1 << to_square)) or (self.en_passant_target == to_square):
+                    captured_piece = self.get_piece_at_square(to_square) if (enemy_pieces & (1 << to_square)) else ('p' if piece.isupper() else 'P')
                     if to_square // 8 == promotion_rank:
                         for promotion_piece in ['Q', 'R', 'B', 'N']:
                             prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
-                            moves.append(Move(piece, from_square, to_square, promotion=prom_piece))
+                            moves.append(Move(piece, from_square, to_square, captured_piece, promoted_piece=prom_piece))
                     else:
-                        moves.append(Move(piece, from_square, to_square))
+                        moves.append(Move(piece, from_square, to_square, captured_piece))
                 elif attacks_only:
                     moves.append(Move(piece, from_square, to_square))
 
         if attacks_only:
             return moves
 
+        # Forward moves
         to_square = from_square + direction
         if 0 <= to_square < 64 and not (self.occupied & (1 << to_square)):
             if to_square // 8 == promotion_rank:
                 for promotion_piece in ['Q', 'R', 'B', 'N']:
                     prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
-                    moves.append(Move(piece, from_square, to_square, promotion=prom_piece))
+                    moves.append(Move(piece, from_square, to_square, promoted_piece=prom_piece))
             else:
                 moves.append(Move(piece, from_square, to_square))
             if from_square // 8 == start_rank:
