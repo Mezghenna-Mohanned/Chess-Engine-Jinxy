@@ -162,6 +162,11 @@ class Board:
 
         self.white_to_move = not self.white_to_move
 
+    def get_last_move(self):
+            if self.move_history:
+                return self.move_history[-1]
+            return None
+
     def undo_move(self, move):
         if not self.move_history:
             return
