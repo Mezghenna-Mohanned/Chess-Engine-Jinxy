@@ -356,39 +356,57 @@ class Board:
         own_pieces = self.occupied_white if piece.isupper() else self.occupied_black
         promotion_rank = 7 if piece.isupper() else 0
 
-        # Capture moves
         for capture_direction in [-1, 1]:
             to_square = from_square + direction + capture_direction
             if 0 <= to_square < 64 and abs((from_square % 8) - (to_square % 8)) == 1:
-                if (enemy_pieces & (1 << to_square)) or (self.en_passant_target == to_square):
-                    captured_piece = self.get_piece_at_square(to_square) if (enemy_pieces & (1 << to_square)) else ('p' if piece.isupper() else 'P')
-                    if to_square // 8 == promotion_rank:
+                is_promotion = to_square // 8 == promotion_rank
+                is_en_passant = (to_square == self.en_passant_target)
+                if (enemy_pieces & (1 << to_square)) or is_en_passant:
+                    captured_piece = (
+                        self.get_piece_at_square(to_square)
+                        if enemy_pieces & (1 << to_square)
+                        else ('p' if piece.isupper() else 'P')
+                    )
+                    if is_promotion:
                         for promotion_piece in ['Q', 'R', 'B', 'N']:
                             prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
-                            moves.append(Move(piece, from_square, to_square, captured_piece, promoted_piece=prom_piece))
+                            moves.append(Move(
+                                piece, from_square, to_square,
+                                captured_piece=captured_piece,
+                                promoted_piece=prom_piece,
+                                is_en_passant=is_en_passant
+                            ))
                     else:
-                        moves.append(Move(piece, from_square, to_square, captured_piece))
+                        moves.append(Move(
+                            piece, from_square, to_square,
+                            captured_piece=captured_piece,
+                            is_en_passant=is_en_passant
+                        ))
                 elif attacks_only:
                     moves.append(Move(piece, from_square, to_square))
 
         if attacks_only:
             return moves
 
-        # Forward moves
         to_square = from_square + direction
         if 0 <= to_square < 64 and not (self.occupied & (1 << to_square)):
-            if to_square // 8 == promotion_rank:
+            is_promotion = to_square // 8 == promotion_rank
+            if is_promotion:
                 for promotion_piece in ['Q', 'R', 'B', 'N']:
                     prom_piece = promotion_piece if piece.isupper() else promotion_piece.lower()
-                    moves.append(Move(piece, from_square, to_square, promoted_piece=prom_piece))
+                    moves.append(Move(
+                        piece, from_square, to_square,
+                        promoted_piece=prom_piece
+                    ))
             else:
                 moves.append(Move(piece, from_square, to_square))
-            if from_square // 8 == start_rank:
-                to_square2 = from_square + 2 * direction
-                if not (self.occupied & (1 << to_square2)):
-                    moves.append(Move(piece, from_square, to_square2))
+                if from_square // 8 == start_rank:
+                    to_square2 = from_square + 2 * direction
+                    if not (self.occupied & (1 << to_square2)) and not (self.occupied & (1 << (from_square + direction))):
+                        moves.append(Move(piece, from_square, to_square2))
 
         return moves
+
 
     def _generate_knight_moves(self, piece, from_square, attacks_only=False):
         moves = []
@@ -526,7 +544,16 @@ class Board:
         return evaluate(self)
 
 class Move:
-    def __init__(self, piece, from_square, to_square, captured_piece=None, promoted_piece=None, is_en_passant=False, is_castling=False):
+    def __init__(
+        self,
+        piece,
+        from_square,
+        to_square,
+        captured_piece=None,
+        promoted_piece=None,
+        is_en_passant=False,
+        is_castling=False,
+    ):
         self.piece = piece
         self.from_square = from_square
         self.to_square = to_square
@@ -536,19 +563,39 @@ class Move:
         self.is_castling = is_castling
 
     def __eq__(self, other):
-        return (self.piece == other.piece and
-                self.from_square == other.from_square and
-                self.to_square == other.to_square and
-                self.promoted_piece == other.promoted_piece)
+        return (
+            isinstance(other, Move) and
+            self.piece == other.piece and
+            self.from_square == other.from_square and
+            self.to_square == other.to_square and
+            self.captured_piece == other.captured_piece and
+            self.promoted_piece == other.promoted_piece and
+            self.is_en_passant == other.is_en_passant and
+            self.is_castling == other.is_castling
+        )
+
 
     def __hash__(self):
-        return hash((self.piece, self.from_square, self.to_square, self.promoted_piece))
+        return hash((
+            self.piece,
+            self.from_square,
+            self.to_square,
+            self.promoted_piece,
+            self.is_en_passant,
+            self.is_castling,
+        ))
 
     def __repr__(self):
-        move_str = f"{self.piece}{square_to_algebraic(self.from_square)}{square_to_algebraic(self.to_square)}"
+        move_str = f"{square_to_algebraic(self.from_square)}{square_to_algebraic(self.to_square)}"
         if self.promoted_piece:
             move_str += f"={self.promoted_piece}"
+        if self.is_castling:
+            if self.to_square in [6, 62]:
+                move_str = "O-O"
+            elif self.to_square in [2, 58]:
+                move_str = "O-O-O"
         return move_str
+
 
 
 
