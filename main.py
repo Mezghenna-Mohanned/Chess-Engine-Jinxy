@@ -3,11 +3,20 @@ from minimax import find_best_move
 from display import display_board
 from board import Move
 from evaluation import evaluate
+from opening_book import load_opening_book_from_pgn
+from utils import algebraic_to_square
+import random
 
 def main():
+    pgn_file_path = r"C:\Users\firefly\Desktop\Chess\pgns\wrchessmast24.pgn"
+    opening_book = load_opening_book_from_pgn(pgn_file_path)
+    engine = ChessEngine(opening_book)
+
     board = Board()
+    
     while not board.is_game_over():
         display_board(board)
+        
         if board.white_to_move:
             print("Your turn (White). Enter your move in UCI format (e.g., e2e4):")
             move = None
@@ -22,11 +31,13 @@ def main():
                         print("Illegal move. Please try again.")
                         move = None
             board.make_move(move)
+        
         else:
             print("AI's turn (Black). Thinking...")
-            move = find_best_move(board, 3)
+            move = engine.find_best_move(board, 3)
             print(f"AI plays: {move}")
             board.make_move(move)
+    
     print("Game over.")
     display_board(board)
     if board.is_checkmate():
@@ -34,6 +45,19 @@ def main():
         print(f"Checkmate! {winner} wins.")
     else:
         print("Draw.")
+
+class ChessEngine:
+    def __init__(self, opening_book):
+        self.opening_book = opening_book
+
+    def find_best_move(self, board, max_depth):
+        fen = board.fen()
+        if fen in self.opening_book:
+            book_moves = self.opening_book[fen]
+            if book_moves:
+                return random.choice(book_moves)
+            
+        return find_best_move(board, max_depth)
 
 def parse_move(move_str, board):
     if len(move_str) < 4 or len(move_str) > 5:
@@ -72,19 +96,6 @@ def parse_move(move_str, board):
 
     move = Move(piece, from_square, to_square, captured_piece, promoted_piece, is_en_passant, is_castling)
     return move
-
-def algebraic_to_square(algebraic):
-    files = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7}
-    ranks = {'1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7}
-
-    if len(algebraic) != 2:
-        return None
-    file_char = algebraic[0]
-    rank_char = algebraic[1]
-    if file_char in files and rank_char in ranks:
-        return ranks[rank_char] * 8 + files[file_char]
-    else:
-        return None
 
 if __name__ == "__main__":
     main()

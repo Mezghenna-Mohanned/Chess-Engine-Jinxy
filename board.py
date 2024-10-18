@@ -1,6 +1,8 @@
 from constants import INITIAL_POSITIONS, FILE_MASKS
 import random
 
+from utils import algebraic_to_square
+
 class Board:
     def __init__(self):
         self.bitboards = INITIAL_POSITIONS.copy()
@@ -448,6 +450,54 @@ class Board:
         moves.extend(self._generate_bishop_moves(piece, from_square, attacks_only))
         moves.extend(self._generate_rook_moves(piece, from_square, attacks_only))
         return moves
+
+
+    def fen(self):
+        fen = []
+        empty = 0
+        for rank in range(7, -1, -1):
+            for file in range(8):
+                square = rank * 8 + file
+                piece = self.get_piece_at_square(square)
+                if piece:
+                    if empty > 0:
+                        fen.append(str(empty))
+                        empty = 0
+                    fen.append(piece)
+                else:
+                    empty += 1
+            if empty > 0:
+                fen.append(str(empty))
+                empty = 0
+            if rank > 0:
+                fen.append('/')
+
+        fen.append(' w' if self.white_to_move else ' b')
+
+        castling_rights = ''
+        if self.castling_rights['K']:
+            castling_rights += 'K'
+        if self.castling_rights['Q']:
+            castling_rights += 'Q'
+        if self.castling_rights['k']:
+            castling_rights += 'k'
+        if self.castling_rights['q']:
+            castling_rights += 'q'
+        fen.append(f' {castling_rights if castling_rights else "-"}')
+
+
+        if self.en_passant_target is not None:
+            en_passant_square = square_to_algebraic(self.en_passant_target)
+            fen.append(f' {en_passant_square}')
+        else:
+            fen.append(' -')
+        fen.append(f' {self.halfmove_clock}')
+        fen.append(f' {self.fullmove_number}')
+        
+        return ''.join(fen)
+
+
+    
 
     def _generate_king_moves(self, piece, from_square, attacks_only=False):
         moves = []
