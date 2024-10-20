@@ -75,8 +75,15 @@ class Board:
         self.occupied = self.occupied_white | self.occupied_black
 
     def make_move(self, move):
-        # Save the current state for undo functionality
+    # Save the current state for undo functionality and details of the move made
         self.move_history.append({
+            'from_square': move.from_square,  # assuming 'move' has a from_square attribute
+            'to_square': move.to_square,      # assuming 'move' has a to_square attribute
+            'promoted_piece': move.promoted_piece if hasattr(move, 'promoted_piece') else None,
+            'captured_piece': move.captured_piece if hasattr(move, 'captured_piece') else None,
+            'is_en_passant': move.is_en_passant if hasattr(move, 'is_en_passant') else False,
+            'is_castling': move.is_castling if hasattr(move, 'is_castling') else False,
+            # Also save the complete board state if necessary
             'bitboards': self.bitboards.copy(),
             'white_to_move': self.white_to_move,
             'castling_rights': self.castling_rights.copy(),
@@ -84,7 +91,8 @@ class Board:
             'halfmove_clock': self.halfmove_clock,
             'fullmove_number': self.fullmove_number,
             'zobrist_hash': self.zobrist_hash,
-        })
+    })
+
 
         self.zobrist_hash ^= self.zobrist_side_key
 
@@ -163,9 +171,12 @@ class Board:
         self.white_to_move = not self.white_to_move
 
     def get_last_move(self):
-            if self.move_history:
-                return self.move_history[-1]
-            return None
+        # Assuming move_history is a list of moves where each move is a dictionary
+        if self.move_history:
+            return self.move_history[-1]
+        return None
+
+
 
     def undo_move(self, move):
         if not self.move_history:
