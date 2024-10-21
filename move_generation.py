@@ -283,8 +283,3 @@ for square in range(64):
         if 0 <= r < 8 and 0 <= f < 8:
             KING_MOVES[square] |= 1 << (r * 8 + f)
 
-def square_to_algebraic(square):
-    files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-    rank = square // 8
-    file = square % 8
-    return f"{files[file]}{rank + 1}"

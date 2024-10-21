@@ -1,127 +1,116 @@
 import json
-from board import Board, Move
-from minimax import find_best_move
+from board import Board
 from display import display_board
+from board import Move
 from utils import algebraic_to_square
 import random
 
-def load_opening_tree(json_path):
-    with open(json_path, 'r') as f:
-        return json.load(f)
-
-class ChessEngine:
-    def __init__(self, opening_tree):
-        self.opening_tree = opening_tree
-        self.current_node = self.opening_tree
-
-    def update_current_node(self, move_str):
-        """
-        Update the current node of the opening tree based on the move made by the player.
-        """
-        print(f"Updating current node with move: {move_str}")
-        if self.current_node and move_str in self.current_node:
-            if "next" in self.current_node[move_str]:
-                print(f"Move {move_str} found in opening book, moving to next node.")
-                self.current_node = self.current_node[move_str]["next"]
-                return True
-            else:
-                print(f"Move {move_str} found but no further moves in the book.")
-                self.current_node = None
-                return False
-        else:
-            print(f"Move {move_str} not found in opening book.")
-            self.current_node = None
-            return False
-
-
-    def find_best_move(self, board, max_depth):
-
-        if self.current_node and "responses" in self.current_node:
-            response_move = random.choice(self.current_node["responses"])
-            print(f"AI selects move from opening book: {response_move}")
-            if response_move in self.current_node["next"]:
-                print(f"Moving to next node in the opening book after move: {response_move}")
-                self.current_node = self.current_node["next"][response_move]["next"]
-            return parse_move(response_move, board)
-        else:
-            print("Out of opening book. Using minimax algorithm.")
-            return find_best_move(board, max_depth)
-
-
-def parse_move(move_str, board):
+def parse_move_string(move_str, board):
     """
-    Parse a move string (like 'd2d4') and return a Move object.
+    Parses a move string in UCI format and returns a Move object.
+    Returns None if the move is invalid.
     """
     if len(move_str) < 4 or len(move_str) > 5:
-        print("Invalid move format.")
         return None
 
     from_square = algebraic_to_square(move_str[0:2])
     to_square = algebraic_to_square(move_str[2:4])
 
     if from_square is None or to_square is None:
-        print("Invalid move coordinates.")
         return None
 
     piece = board.get_piece_at_square(from_square)
     if piece is None:
-        print("No piece at the specified position.")
         return None
 
-    captured_piece = board.get_piece_at_square(to_square) if board.is_square_occupied_by_opponent(to_square) else None
-    return Move(piece, from_square, to_square, captured_piece)
+    captured_piece = None
+    if board.is_square_occupied_by_opponent(to_square):
+        captured_piece = board.get_piece_at_square(to_square)
+
+    promoted_piece = None
+    if len(move_str) == 5:
+        promotion_char = move_str[4]
+        if promotion_char.upper() in ['Q', 'R', 'B', 'N']:
+            promoted_piece = promotion_char.upper() if piece.isupper() else promotion_char.lower()
+        else:
+            return None
+
+    is_en_passant = False
+    if piece.upper() == 'P' and to_square == board.en_passant_target:
+        is_en_passant = True
+        captured_piece = 'p' if piece.isupper() else 'P'
+
+    is_castling = False
+    if piece.upper() == 'K' and abs(from_square - to_square) == 2:
+        is_castling = True
+
+    move = Move(piece, from_square, to_square, captured_piece, promoted_piece, is_en_passant, is_castling)
+    return move
 
 def main():
-    json_file_path = r"C:\Users\firefly\Desktop\Chess\pgns\chess_opening_tree.json"
-    opening_tree = load_opening_tree(json_file_path)
-    engine = ChessEngine(opening_tree)
+    move_tree_path = r"C:\Users\firefly\Desktop\Chess\pgns\chess_opening_tree2.json"
+
+    try:
+        with open(move_tree_path, 'r') as f:
+            move_tree = json.load(f)
+    except FileNotFoundError:
+        print(f"Move tree file not found at {move_tree_path}. Please ensure the file exists.")
+        return
+
+    engine = ChessEngine(move_tree)
+
     board = Board()
+    current_node = move_tree
 
     while not board.is_game_over():
         display_board(board)
-        
+
         if board.white_to_move:
-
-            user_input = input("Your move: ").strip()
-            move = parse_move(user_input, board)
-            if move and move in board.generate_legal_moves():
-                in_opening_book = engine.update_current_node(user_input)
-                if in_opening_book:
-                    board.make_move(move)
+            print("Your turn (White). Enter your move in UCI format (e.g., e2e4):")
+            move = None
+            while move is None:
+                user_input = input("Your move: ")
+                move = parse_move_string(user_input, board)
+                if move is None:
+                    print("Invalid move format. Please try again.")
                 else:
-                    print("Out of opening book. Proceeding with player's move.")
-                    board.make_move(move)
-            else:
-                print("Illegal move.")
+                    legal_moves = board.generate_legal_moves()
+                    if user_input.lower() not in current_node:
+                        print("Move not found in the move tree. AI cannot respond.")
+                        move = None
+                        continue
+                    if move not in legal_moves:
+                        print("Illegal move. Please try again.")
+                        move = None
+                        continue
+            board.make_move(move)
 
+            move_uci = user_input.lower()
+            if move_uci in current_node:
+                current_node = current_node[move_uci]
+            else:
+                current_node = {}
         else:
             print("AI's turn (Black). Thinking...")
-            if engine.current_node and "responses" in engine.current_node:
-                ai_move_str = random.choice(engine.current_node["responses"])
-                ai_move = parse_move(ai_move_str, board)
+            ai_move = engine.get_ai_move(board, current_node)
+            if ai_move:
+                print(f"AI plays: {ai_move}")
+                move_obj = parse_move_string(ai_move, board)
+                if move_obj is not None:
+                    board.make_move(move_obj)
 
-                if ai_move and ai_move in board.generate_legal_moves():
-                    print(f"AI selects move from opening book: {ai_move_str}")
-                    engine.update_current_node(ai_move_str)
-                    board.make_move(ai_move)
-                else:
-                    print("AI move from opening book is illegal or not found. Switching to minimax.")
-                    ai_move = engine.find_best_move(board, 3)
-                    if ai_move:
-                        board.make_move(ai_move)
-                        ai_move_str = f"{ai_move.from_square}{ai_move.to_square}"
-                        print(f"AI plays using minimax: {ai_move_str}")
+                    ai_move_uci = ai_move.lower()
+                    if ai_move_uci in current_node:
+                        current_node = current_node[ai_move_uci]
                     else:
-                        print("AI could not find a valid move.")
-            else:
-                print("Out of opening book. Using minimax algorithm.")
-                ai_move = engine.find_best_move(board, 3)
-                if ai_move:
-                    board.make_move(ai_move)
-                    ai_move_str = f"{ai_move.from_square}{ai_move.to_square}"
-                    print(f"AI plays using minimax: {ai_move_str}")
+                        current_node = {}
                 else:
-                    print("AI could not find a valid move.")
+                    print("AI selected an invalid move.")
+
+                    break
+            else:
+                print("AI has no predefined response.")
+                break
 
     print("Game over.")
     display_board(board)
@@ -131,6 +120,24 @@ def main():
     else:
         print("Draw.")
 
+class ChessEngine:
+    def __init__(self, move_tree):
+        self.move_tree = move_tree
+
+    def get_ai_move(self, board, current_node):
+        """
+        Selects the AI's move based on the current node in the move tree.
+        If multiple responses are available, selects one randomly.
+        """
+        if not current_node:
+            print("No predefined AI responses available.")
+
+        possible_moves = list(current_node.keys())
+        if not possible_moves:
+            print("No AI responses available for the current position.")
+
+        selected_move = random.choice(possible_moves)
+        return selected_move
 
 if __name__ == "__main__":
     main()
