@@ -74,18 +74,19 @@ def main():
                 if move is None:
                     print("Invalid move format. Please try again.")
                 else:
-                    legal_moves = board.generate_legal_moves()
-                    if user_input.lower() not in current_node:
+                    move_uci = user_input.lower()
+                    if move_uci not in current_node:
                         print("Move not found in the move tree. AI cannot respond.")
                         move = None
                         continue
+                    legal_moves = board.generate_legal_moves()
                     if move not in legal_moves:
                         print("Illegal move. Please try again.")
                         move = None
                         continue
             board.make_move(move)
 
-            move_uci = user_input.lower()
+
             if move_uci in current_node:
                 current_node = current_node[move_uci]
             else:
@@ -131,10 +132,12 @@ class ChessEngine:
         """
         if not current_node:
             print("No predefined AI responses available.")
+            return None
 
         possible_moves = list(current_node.keys())
         if not possible_moves:
             print("No AI responses available for the current position.")
+            return None
 
         selected_move = random.choice(possible_moves)
         return selected_move
