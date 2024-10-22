@@ -1,0 +1,1 @@
+PIECE_IMAGES
