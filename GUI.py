@@ -9,15 +9,16 @@ from minimax import find_best_move
 
 pygame.init()
 
-WIDTH, HEIGHT = 400, 400
+WIDTH, HEIGHT = 600, 600
 ROWS, COLS = 8, 8
 SQUARE_SIZE = WIDTH // COLS
-PIECE_SCALE = 0.8
+PIECE_SCALE = 0.6
 
 WHITE_COLOR = (245, 245, 220)
 BLACK_COLOR = (139, 69, 19)
 TRANSPARENT_GREEN = (0, 255, 0, 100)
 TRANSPARENT_BLUE = (0, 0, 255, 100)
+TRANSPARENT_RED = (255, 0, 0, 150)
 
 FONT = pygame.font.SysFont('Arial', 36)
 
@@ -76,6 +77,8 @@ class GUI:
         self.selected_square = None
         self.valid_moves = []
         self.running = True
+        self.king_in_check = False
+        self.king_square = None
 
     def draw_board(self):
         for row in range(ROWS):
@@ -95,16 +98,21 @@ class GUI:
                     img_rect = piece_image.get_rect(center=(col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2))
                     SCREEN.blit(piece_image, img_rect)
 
-    def highlight_square(self, square, color, width=0):
+    def highlight_squares(self):
+        if self.selected_square is not None:
+            self.highlight_square(self.selected_square, TRANSPARENT_BLUE)
+            for move_square in self.valid_moves:
+                self.highlight_square(move_square, TRANSPARENT_GREEN)
+        if self.king_in_check and self.king_square is not None:
+            self.highlight_square(self.king_square, TRANSPARENT_RED)
+
+    def highlight_square(self, square, color):
         row = 7 - (square // 8)
         col = square % 8
         rect = pygame.Rect(col * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
-        if width > 0:
-            pygame.draw.rect(SCREEN, color, rect, width)
-        else:
-            s = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
-            s.fill(color)
-            SCREEN.blit(s, (col * SQUARE_SIZE, row * SQUARE_SIZE))
+        s = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
+        s.fill(color)
+        SCREEN.blit(s, (col * SQUARE_SIZE, row * SQUARE_SIZE))
 
     def get_square_clicked(self, pos):
         x, y = pos
@@ -117,7 +125,14 @@ class GUI:
     def main_loop(self, engine, current_node):
         while self.running and not self.board.is_game_over():
             self.draw_board()
+            self.highlight_squares()
             self.draw_pieces()
+
+            self.king_in_check = self.board.is_in_check()
+            if self.king_in_check:
+                self.king_square = self.board.find_king_square(self.board.white_to_move)
+            else:
+                self.king_square = None
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -135,10 +150,6 @@ class GUI:
                             if piece and piece.isupper():
                                 self.selected_square = square
                                 self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
-                                self.highlight_square(square, TRANSPARENT_BLUE)
-                                for move in self.board.generate_legal_moves():
-                                    if move.from_square == square:
-                                        self.highlight_square(move.to_square, TRANSPARENT_GREEN)
                         else:
                             move = Move(
                                 piece=self.board.get_piece_at_square(self.selected_square),
@@ -151,9 +162,18 @@ class GUI:
                             )
 
                             legal_moves = self.board.generate_legal_moves()
-                            if move in legal_moves:
-                                self.board.make_move(move)
-                                current_node = self.update_move_tree(move, current_node, engine)
+                            move_found = False
+                            for legal_move in legal_moves:
+                                if (legal_move.from_square == move.from_square and
+                                    legal_move.to_square == move.to_square and
+                                    legal_move.promoted_piece == move.promoted_piece and
+                                    legal_move.is_castling == move.is_castling and
+                                    legal_move.is_en_passant == move.is_en_passant):
+                                    self.board.make_move(legal_move)
+                                    current_node = self.update_move_tree(legal_move, current_node, engine)
+                                    move_found = True
+                                    break
+                            if move_found:
                                 self.selected_square = None
                                 self.valid_moves = []
                             else:

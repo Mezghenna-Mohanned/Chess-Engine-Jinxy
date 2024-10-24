@@ -1,5 +1,3 @@
-# constants.py
-
 PIECE_VALUES = {
     'P': 100,  # White Pawn
     'N': 320,  # White Knight
@@ -113,3 +111,34 @@ def initialize_move_masks():
                 KING_MOVES[square] |= 1 << (r * 8 + f)
 
 initialize_move_masks()
+
+SLIDING_DIRECTIONS = {
+    'bishop': [9, 7, -7, -9],
+    'rook': [8, -8, 1, -1],
+    'queen': [9, 7, -7, -9, 8, -8, 1, -1]
+}
+
+SQUARES = {square: {'neighbors': {}} for square in range(64)}
+
+for square in range(64):
+    rank = square // 8
+    file = square % 8
+
+    for piece_type, directions in SLIDING_DIRECTIONS.items():
+        for direction in directions:
+            neighbor_square = square + direction
+
+            dr = direction // 8
+            df = direction % 8
+
+            if direction < 0:
+                dr = (direction // 8)
+                df = (direction % 8)
+
+            new_rank = rank + (dr if dr < 0 else dr)
+            new_file = file + (df if df < 0 else df)
+
+            if 0 <= new_rank < 8 and 0 <= new_file < 8:
+                SQUARES[square]['neighbors'][direction] = new_rank * 8 + new_file
+            else:
+                SQUARES[square]['neighbors'][direction] = None

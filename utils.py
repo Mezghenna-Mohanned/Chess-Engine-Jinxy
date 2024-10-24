@@ -10,3 +10,10 @@ def algebraic_to_square(algebraic):
         return ranks[rank_char] * 8 + files[file_char]
     else:
         return None
+    
+
+def square_to_algebraic(square):
+    files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+    rank = square // 8 + 1
+    file = square % 8
+    return f"{files[file]}{rank}"
