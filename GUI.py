@@ -79,6 +79,8 @@ class GUI:
         self.running = True
         self.king_in_check = False
         self.king_square = None
+        self.play_again_rect = None
+        self.exit_rect = None
 
     def draw_board(self):
         for row in range(ROWS):
@@ -123,85 +125,138 @@ class GUI:
         return None
 
     def main_loop(self, engine, current_node):
-        while self.running and not self.board.is_game_over():
-            self.draw_board()
-            self.highlight_squares()
-            self.draw_pieces()
+        while self.running:
+            if not self.board.is_game_over():
+                self.draw_board()
+                self.highlight_squares()
+                self.draw_pieces()
 
-            self.king_in_check = self.board.is_in_check()
-            if self.king_in_check:
-                self.king_square = self.board.find_king_square(self.board.white_to_move)
-            else:
-                self.king_square = None
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                    pygame.quit()
-                    sys.exit()
-
-                elif event.type == pygame.MOUSEBUTTONDOWN and self.board.white_to_move:
-                    pos = pygame.mouse.get_pos()
-                    square = self.get_square_clicked(pos)
-
-                    if square is not None:
-                        if self.selected_square is None:
-                            piece = self.board.get_piece_at_square(square)
-                            if piece and piece.isupper():
-                                self.selected_square = square
-                                self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
-                        else:
-                            move = Move(
-                                piece=self.board.get_piece_at_square(self.selected_square),
-                                from_square=self.selected_square,
-                                to_square=square,
-                                captured_piece=self.board.get_piece_at_square(square) if self.board.is_square_occupied_by_opponent(square) else None,
-                                promoted_piece=None,
-                                is_en_passant=False,
-                                is_castling=False
-                            )
-
-                            legal_moves = self.board.generate_legal_moves()
-                            move_found = False
-                            for legal_move in legal_moves:
-                                if (legal_move.from_square == move.from_square and
-                                    legal_move.to_square == move.to_square and
-                                    legal_move.promoted_piece == move.promoted_piece and
-                                    legal_move.is_castling == move.is_castling and
-                                    legal_move.is_en_passant == move.is_en_passant):
-                                    self.board.make_move(legal_move)
-                                    current_node = self.update_move_tree(legal_move, current_node, engine)
-                                    move_found = True
-                                    break
-                            if move_found:
-                                self.selected_square = None
-                                self.valid_moves = []
-                            else:
-                                self.selected_square = None
-                                self.valid_moves = []
-
-            if not self.board.white_to_move and self.running:
-                pygame.time.delay(500)
-                ai_move = engine.get_ai_move(self.board, current_node, use_move_tree=True, max_depth=3)
-                if ai_move:
-                    print(f"AI plays: {ai_move}")
-                    move_obj = self.parse_move(ai_move)
-                    if move_obj:
-                        self.board.make_move(move_obj)
-                        current_node = self.update_move_tree(move_obj, current_node, engine)
-                    else:
-                        print("AI selected an invalid move.")
-                        self.running = False
+                self.king_in_check = self.board.is_in_check()
+                if self.king_in_check:
+                    self.king_square = self.board.find_king_square(self.board.white_to_move)
                 else:
-                    print("AI has no predefined response.")
-                    self.running = False
+                    self.king_square = None
 
-            pygame.display.flip()
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                        pygame.quit()
+                        sys.exit()
 
-        self.draw_board()
-        self.draw_pieces()
+                    elif event.type == pygame.MOUSEBUTTONDOWN and self.board.white_to_move:
+                        pos = pygame.mouse.get_pos()
+                        square = self.get_square_clicked(pos)
+
+                        if square is not None:
+                            if self.selected_square is None:
+                                piece = self.board.get_piece_at_square(square)
+                                if piece and piece.isupper():
+                                    self.selected_square = square
+                                    self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                            else:
+                                if square == self.selected_square:
+                                    self.selected_square = None
+                                    self.valid_moves = []
+                                elif square in self.valid_moves:
+                                    legal_moves = self.board.generate_legal_moves()
+                                    move_found = False
+                                    for legal_move in legal_moves:
+                                        if legal_move.from_square == self.selected_square and legal_move.to_square == square:
+                                            self.board.make_move(legal_move)
+                                            current_node = self.update_move_tree(legal_move, current_node, engine)
+                                            move_found = True
+                                            break
+                                    if move_found:
+                                        self.selected_square = None
+                                        self.valid_moves = []
+                                    else:
+                                        self.selected_square = None
+                                        self.valid_moves = []
+                                else:
+                                    piece = self.board.get_piece_at_square(square)
+                                    if piece and piece.isupper():
+                                        self.selected_square = square
+                                        self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                                    else:
+                                        pass
+
+                if not self.board.white_to_move and self.running:
+                    pygame.time.delay(500)
+                    ai_move = engine.get_ai_move(self.board, current_node, use_move_tree=True, max_depth=3)
+                    if ai_move:
+                        print(f"AI plays: {ai_move}")
+                        move_obj = self.parse_move(ai_move)
+                        if move_obj:
+                            self.board.make_move(move_obj)
+                            current_node = self.update_move_tree(move_obj, current_node, engine)
+                        else:
+                            print("AI selected an invalid move.")
+                    else:
+                        print("AI has no legal moves.")
+
+
+                pygame.display.flip()
+            else:
+
+                self.draw_board()
+                self.draw_pieces()
+                self.display_game_over()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        pos = pygame.mouse.get_pos()
+                        if self.play_again_rect.collidepoint(pos):
+                            self.restart_game()
+                            current_node = engine.move_tree
+                        elif self.exit_rect.collidepoint(pos):
+                            self.running = False
+                            pygame.quit()
+                            sys.exit()
+
+                pygame.display.flip()
+
+    def display_game_over(self):
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        SCREEN.blit(overlay, (0, 0))
+
+        if self.board.is_checkmate():
+            if self.board.white_to_move:
+                message = "You lost!"
+            else:
+                message = "You won!"
+        else:
+            message = "Draw."
+
+        text = FONT.render(message, True, (255, 255, 255))
+        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
+        SCREEN.blit(text, text_rect)
+
+        play_again_text = FONT.render("Play Again", True, (255, 255, 255))
+        play_again_rect = play_again_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
+        pygame.draw.rect(SCREEN, (0, 128, 0), play_again_rect.inflate(20, 10))
+        SCREEN.blit(play_again_text, play_again_rect)
+
+        exit_text = FONT.render("Exit", True, (255, 255, 255))
+        exit_rect = exit_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 80))
+        pygame.draw.rect(SCREEN, (128, 0, 0), exit_rect.inflate(20, 10))
+        SCREEN.blit(exit_text, exit_rect)
+
+        self.play_again_rect = play_again_rect
+        self.exit_rect = exit_rect
+
         pygame.display.flip()
-        self.display_game_over()
+
+    def restart_game(self):
+        self.board = Board()
+        self.selected_square = None
+        self.valid_moves = []
+        self.king_in_check = False
+        self.king_square = None
 
     def parse_move(self, move_str):
         from_square = algebraic_to_square(move_str[0:2])
@@ -252,22 +307,6 @@ class GUI:
             return current_node[move_uci]
         else:
             return {}
-
-    def display_game_over(self):
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))
-        SCREEN.blit(overlay, (0, 0))
-
-        if self.board.is_checkmate():
-            winner = "Black" if not self.board.white_to_move else "White"
-            message = f"Checkmate! {winner} wins."
-        else:
-            message = "Draw."
-
-        text = FONT.render(message, True, (255, 255, 255))
-        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-        SCREEN.blit(text, text_rect)
-        pygame.display.flip()
 
 class ChessEngine:
     def __init__(self, move_tree):

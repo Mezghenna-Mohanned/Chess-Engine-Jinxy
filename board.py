@@ -34,7 +34,6 @@ class Board:
         self.zobrist_side_key = random.getrandbits(64)
         self.zobrist_hash = self.compute_zobrist_hash()
 
-
     def compute_zobrist_hash(self):
         zobrist_hash = 0
         for piece, bitboard in self.bitboards.items():
@@ -55,14 +54,13 @@ class Board:
         return zobrist_hash
 
     def get_squares_from_bitboard(self, bitboard):
-            squares = []
-            while bitboard:
-                lsb = bitboard & -bitboard
-                square = (lsb).bit_length() - 1
-                squares.append(square)
-                bitboard &= bitboard - 1
-            return squares
-
+        squares = []
+        while bitboard:
+            lsb = bitboard & -bitboard
+            square = (lsb).bit_length() - 1
+            squares.append(square)
+            bitboard &= bitboard - 1
+        return squares
 
     def update_occupied(self):
         self.occupied_white = 0
@@ -74,16 +72,14 @@ class Board:
                 self.occupied_black |= bitboard
         self.occupied = self.occupied_white | self.occupied_black
 
-    def make_move(self, move):
-    # Save the current state for undo functionality and details of the move made
+    def make_move(self, move, change_turn=True):
         self.move_history.append({
-            'from_square': move.from_square,  # assuming 'move' has a from_square attribute
-            'to_square': move.to_square,      # assuming 'move' has a to_square attribute
+            'from_square': move.from_square,
+            'to_square': move.to_square,
             'promoted_piece': move.promoted_piece if hasattr(move, 'promoted_piece') else None,
             'captured_piece': move.captured_piece if hasattr(move, 'captured_piece') else None,
             'is_en_passant': move.is_en_passant if hasattr(move, 'is_en_passant') else False,
             'is_castling': move.is_castling if hasattr(move, 'is_castling') else False,
-            # Also save the complete board state if necessary
             'bitboards': self.bitboards.copy(),
             'white_to_move': self.white_to_move,
             'castling_rights': self.castling_rights.copy(),
@@ -91,8 +87,7 @@ class Board:
             'halfmove_clock': self.halfmove_clock,
             'fullmove_number': self.fullmove_number,
             'zobrist_hash': self.zobrist_hash,
-    })
-
+        })
 
         self.zobrist_hash ^= self.zobrist_side_key
 
@@ -168,15 +163,8 @@ class Board:
 
         self.update_occupied()
 
-        self.white_to_move = not self.white_to_move
-
-    def get_last_move(self):
-        # Assuming move_history is a list of moves where each move is a dictionary
-        if self.move_history:
-            return self.move_history[-1]
-        return None
-
-
+        if change_turn:
+            self.white_to_move = not self.white_to_move
 
     def undo_move(self, move):
         if not self.move_history:
@@ -263,7 +251,6 @@ class Board:
             return None
 
     def is_square_attacked(self, square, by_white):
-        attacking_moves = []
         if by_white:
             for piece in 'PNBRQK':
                 bitboard = self.bitboards.get(piece, 0)
@@ -324,7 +311,7 @@ class Board:
                     bitboard &= bitboard - 1
 
         for move in all_moves:
-            self.make_move(move)
+            self.make_move(move, change_turn=False)
             if not self.is_in_check():
                 legal_moves.append(move)
             self.undo_move(move)
@@ -389,7 +376,6 @@ class Board:
                         moves.append(Move(piece, from_square, to_square2))
 
         return moves
-
 
     def _generate_knight_moves(self, piece, from_square, attacks_only=False):
         moves = []
@@ -466,54 +452,6 @@ class Board:
         moves.extend(self._generate_bishop_moves(piece, from_square, attacks_only))
         moves.extend(self._generate_rook_moves(piece, from_square, attacks_only))
         return moves
-
-
-    def fen(self):
-        fen = []
-        empty = 0
-        for rank in range(7, -1, -1):
-            for file in range(8):
-                square = rank * 8 + file
-                piece = self.get_piece_at_square(square)
-                if piece:
-                    if empty > 0:
-                        fen.append(str(empty))
-                        empty = 0
-                    fen.append(piece)
-                else:
-                    empty += 1
-            if empty > 0:
-                fen.append(str(empty))
-                empty = 0
-            if rank > 0:
-                fen.append('/')
-
-        fen.append(' w' if self.white_to_move else ' b')
-
-        castling_rights = ''
-        if self.castling_rights['K']:
-            castling_rights += 'K'
-        if self.castling_rights['Q']:
-            castling_rights += 'Q'
-        if self.castling_rights['k']:
-            castling_rights += 'k'
-        if self.castling_rights['q']:
-            castling_rights += 'q'
-        fen.append(f' {castling_rights if castling_rights else "-"}')
-
-
-        if self.en_passant_target is not None:
-            en_passant_square = square_to_algebraic(self.en_passant_target)
-            fen.append(f' {en_passant_square}')
-        else:
-            fen.append(' -')
-        fen.append(f' {self.halfmove_clock}')
-        fen.append(f' {self.fullmove_number}')
-        
-        return ''.join(fen)
-
-
-    
 
     def _generate_king_moves(self, piece, from_square, attacks_only=False):
         moves = []
@@ -606,7 +544,6 @@ class Move:
             self.is_castling == other.is_castling
         )
 
-
     def __hash__(self):
         return hash((
             self.piece,
@@ -627,9 +564,6 @@ class Move:
             elif self.to_square in [2, 58]:
                 move_str = "O-O-O"
         return move_str
-
-
-
 
 def square_to_algebraic(square):
     files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
