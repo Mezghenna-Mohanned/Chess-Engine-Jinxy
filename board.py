@@ -135,11 +135,13 @@ class Board:
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][0]
                 self.zobrist_hash ^= self.zobrist_piece_keys['R'][3]
             elif to_square == 62:
+                # Black king-side castling
                 self.bitboards['r'] &= ~(1 << 63)
                 self.bitboards['r'] |= (1 << 61)
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][63]
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][61]
             elif to_square == 58:
+                # Black queen-side castling
                 self.bitboards['r'] &= ~(1 << 56)
                 self.bitboards['r'] |= (1 << 59)
                 self.zobrist_hash ^= self.zobrist_piece_keys['r'][56]
@@ -182,33 +184,49 @@ class Board:
 
     def update_castling_rights(self, piece, from_square, to_square):
         if piece == 'K':
+            if self.castling_rights['K']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['K']
+            if self.castling_rights['Q']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['Q']
             self.castling_rights['K'] = False
             self.castling_rights['Q'] = False
         elif piece == 'k':
+            if self.castling_rights['k']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['k']
+            if self.castling_rights['q']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['q']
             self.castling_rights['k'] = False
             self.castling_rights['q'] = False
         elif piece == 'R':
-            if from_square == 0:
+            if from_square == 0 and self.castling_rights['Q']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['Q']
                 self.castling_rights['Q'] = False
-            elif from_square == 7:
+            elif from_square == 7 and self.castling_rights['K']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['K']
                 self.castling_rights['K'] = False
         elif piece == 'r':
-            if from_square == 56:
+            if from_square == 56 and self.castling_rights['q']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['q']
                 self.castling_rights['q'] = False
-            elif from_square == 63:
+            elif from_square == 63 and self.castling_rights['k']:
+                self.zobrist_hash ^= self.zobrist_castling_keys['k']
                 self.castling_rights['k'] = False
 
         if self.is_square_occupied_by_opponent(to_square):
             captured_piece = self.get_piece_at_square(to_square)
             if captured_piece == 'R':
-                if to_square == 0:
+                if to_square == 0 and self.castling_rights['Q']:
+                    self.zobrist_hash ^= self.zobrist_castling_keys['Q']
                     self.castling_rights['Q'] = False
-                elif to_square == 7:
+                elif to_square == 7 and self.castling_rights['K']:
+                    self.zobrist_hash ^= self.zobrist_castling_keys['K']
                     self.castling_rights['K'] = False
             elif captured_piece == 'r':
-                if to_square == 56:
+                if to_square == 56 and self.castling_rights['q']:
+                    self.zobrist_hash ^= self.zobrist_castling_keys['q']
                     self.castling_rights['q'] = False
-                elif to_square == 63:
+                elif to_square == 63 and self.castling_rights['k']:
+                    self.zobrist_hash ^= self.zobrist_castling_keys['k']
                     self.castling_rights['k'] = False
 
     def is_square_occupied_by_opponent(self, square):
@@ -466,7 +484,61 @@ class Board:
                 if abs(from_file - to_file) <= 1:
                     if not (own_pieces & (1 << to_square)):
                         moves.append(Move(piece, from_square, to_square))
+        if not attacks_only:
+            moves.extend(self._generate_castling_moves(piece, from_square))
         return moves
+
+    def _generate_castling_moves(self, piece, from_square):
+        moves = []
+        if self.is_in_check():
+            return moves
+        if piece.isupper():
+            king_side = self.castling_rights.get('K', False)
+            queen_side = self.castling_rights.get('Q', False)
+            enemy_attacks = self.get_all_attacked_squares(not self.white_to_move)
+            if king_side:
+                if not self.occupied & (1 << 5) and not self.occupied & (1 << 6):
+                    if not any(sq in enemy_attacks for sq in [4, 5, 6]):
+                        moves.append(Move(piece, from_square, 6, is_castling=True))
+            if queen_side:
+                if not self.occupied & (1 << 1) and not self.occupied & (1 << 2) and not self.occupied & (1 << 3):
+                    if not any(sq in enemy_attacks for sq in [2, 3, 4]):
+                        moves.append(Move(piece, from_square, 2, is_castling=True))
+        else:
+            king_side = self.castling_rights.get('k', False)
+            queen_side = self.castling_rights.get('q', False)
+            enemy_attacks = self.get_all_attacked_squares(not self.white_to_move)
+            if king_side:
+                if not self.occupied & (1 << 61) and not self.occupied & (1 << 62):
+                    if not any(sq in enemy_attacks for sq in [60, 61, 62]):
+                        moves.append(Move(piece, from_square, 62, is_castling=True))
+            if queen_side:
+                if not self.occupied & (1 << 57) and not self.occupied & (1 << 58) and not self.occupied & (1 << 59):
+                    if not any(sq in enemy_attacks for sq in [58, 59, 60]):
+                        moves.append(Move(piece, from_square, 58, is_castling=True))
+        return moves
+
+    def get_all_attacked_squares(self, by_white):
+        attacked_squares = set()
+        if by_white:
+            for piece in 'PNBRQK':
+                bitboard = self.bitboards.get(piece, 0)
+                while bitboard:
+                    from_square = (bitboard & -bitboard).bit_length() - 1
+                    moves = self.generate_piece_moves(piece, from_square, attacks_only=True)
+                    for move in moves:
+                        attacked_squares.add(move.to_square)
+                    bitboard &= bitboard - 1
+        else:
+            for piece in 'pnbrqk':
+                bitboard = self.bitboards.get(piece, 0)
+                while bitboard:
+                    from_square = (bitboard & -bitboard).bit_length() - 1
+                    moves = self.generate_piece_moves(piece, from_square, attacks_only=True)
+                    for move in moves:
+                        attacked_squares.add(move.to_square)
+                    bitboard &= bitboard - 1
+        return attacked_squares
 
     def get_piece_at_square(self, square):
         for piece, bitboard in self.bitboards.items():
@@ -570,3 +642,4 @@ def square_to_algebraic(square):
     rank = square // 8 + 1
     file = square % 8
     return f"{files[file]}{rank}"
+

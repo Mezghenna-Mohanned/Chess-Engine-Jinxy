@@ -81,6 +81,9 @@ class GUI:
         self.king_square = None
         self.play_again_rect = None
         self.exit_rect = None
+        self.promotion_move = None
+        self.promotion_pieces = ['Q', 'R', 'B', 'N']
+        self.promotion_rects = []
 
     def draw_board(self):
         for row in range(ROWS):
@@ -143,42 +146,68 @@ class GUI:
                         pygame.quit()
                         sys.exit()
 
-                    elif event.type == pygame.MOUSEBUTTONDOWN and self.board.white_to_move:
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
                         pos = pygame.mouse.get_pos()
-                        square = self.get_square_clicked(pos)
+                        if self.promotion_move:
+                            # Handle promotion choice
+                            for i, rect in enumerate(self.promotion_rects):
+                                if rect.collidepoint(pos):
+                                    promoted_piece = self.promotion_pieces[i]
+                                    self.promotion_move.promoted_piece = promoted_piece
+                                    self.board.make_move(self.promotion_move)
+                                    current_node = self.update_move_tree(self.promotion_move, current_node, engine)
+                                    self.promotion_move = None
+                                    break
+                        elif self.board.white_to_move:
+                            square = self.get_square_clicked(pos)
 
-                        if square is not None:
-                            if self.selected_square is None:
-                                piece = self.board.get_piece_at_square(square)
-                                if piece and piece.isupper():
-                                    self.selected_square = square
-                                    self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
-                            else:
-                                if square == self.selected_square:
-                                    self.selected_square = None
-                                    self.valid_moves = []
-                                elif square in self.valid_moves:
-                                    legal_moves = self.board.generate_legal_moves()
-                                    move_found = False
-                                    for legal_move in legal_moves:
-                                        if legal_move.from_square == self.selected_square and legal_move.to_square == square:
-                                            self.board.make_move(legal_move)
-                                            current_node = self.update_move_tree(legal_move, current_node, engine)
-                                            move_found = True
-                                            break
-                                    if move_found:
-                                        self.selected_square = None
-                                        self.valid_moves = []
-                                    else:
-                                        self.selected_square = None
-                                        self.valid_moves = []
-                                else:
+                            if square is not None:
+                                if self.selected_square is None:
                                     piece = self.board.get_piece_at_square(square)
                                     if piece and piece.isupper():
                                         self.selected_square = square
                                         self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                                else:
+                                    if square == self.selected_square:
+                                        # Deselect the piece if clicked again
+                                        self.selected_square = None
+                                        self.valid_moves = []
+                                    elif square in self.valid_moves:
+                                        # Proceed to make the move
+                                        legal_moves = self.board.generate_legal_moves()
+                                        move_found = False
+                                        for legal_move in legal_moves:
+                                            if legal_move.from_square == self.selected_square and legal_move.to_square == square:
+                                                if legal_move.promoted_piece:
+                                                    # Prompt for promotion piece
+                                                    self.promotion_move = legal_move
+                                                else:
+                                                    self.board.make_move(legal_move)
+                                                    current_node = self.update_move_tree(legal_move, current_node, engine)
+                                                move_found = True
+                                                break
+                                        if move_found:
+                                            self.selected_square = None
+                                            self.valid_moves = []
+                                        else:
+                                            self.selected_square = None
+                                            self.valid_moves = []
                                     else:
-                                        pass
+                                        # Check if clicked on another of the player's own pieces to change selection
+                                        piece = self.board.get_piece_at_square(square)
+                                        if piece and piece.isupper():
+                                            self.selected_square = square
+                                            self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                                        else:
+                                            # Clicked on an invalid square; keep the current selection
+                                            pass
+
+                if self.promotion_move:
+                    self.draw_board()
+                    self.draw_pieces()
+                    self.draw_promotion_choices()
+                    pygame.display.flip()
+                    continue
 
                 if not self.board.white_to_move and self.running:
                     pygame.time.delay(500)
@@ -191,13 +220,14 @@ class GUI:
                             current_node = self.update_move_tree(move_obj, current_node, engine)
                         else:
                             print("AI selected an invalid move.")
+                            # Do not set self.running = False; let the game detect the end
                     else:
                         print("AI has no legal moves.")
-
+                        # Do not set self.running = False; let the game detect the end
 
                 pygame.display.flip()
             else:
-
+                # Game is over
                 self.draw_board()
                 self.draw_pieces()
                 self.display_game_over()
@@ -210,9 +240,11 @@ class GUI:
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         pos = pygame.mouse.get_pos()
                         if self.play_again_rect.collidepoint(pos):
+                            # Restart the game
                             self.restart_game()
                             current_node = engine.move_tree
                         elif self.exit_rect.collidepoint(pos):
+                            # Exit the game
                             self.running = False
                             pygame.quit()
                             sys.exit()
@@ -236,16 +268,19 @@ class GUI:
         text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
         SCREEN.blit(text, text_rect)
 
+        # Add "Play Again" button
         play_again_text = FONT.render("Play Again", True, (255, 255, 255))
         play_again_rect = play_again_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
         pygame.draw.rect(SCREEN, (0, 128, 0), play_again_rect.inflate(20, 10))
         SCREEN.blit(play_again_text, play_again_rect)
 
+        # Add "Exit" button
         exit_text = FONT.render("Exit", True, (255, 255, 255))
         exit_rect = exit_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 80))
         pygame.draw.rect(SCREEN, (128, 0, 0), exit_rect.inflate(20, 10))
         SCREEN.blit(exit_text, exit_rect)
 
+        # Store the rects to detect clicks
         self.play_again_rect = play_again_rect
         self.exit_rect = exit_rect
 
@@ -257,11 +292,55 @@ class GUI:
         self.valid_moves = []
         self.king_in_check = False
         self.king_square = None
+        self.promotion_move = None
+        self.promotion_rects = []
+
+    def draw_promotion_choices(self):
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        SCREEN.blit(overlay, (0, 0))
+
+        text = FONT.render("Choose promotion piece:", True, (255, 255, 255))
+        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+        SCREEN.blit(text, text_rect)
+
+        self.promotion_rects = []
+        piece_size = SQUARE_SIZE
+        y = HEIGHT // 2 - piece_size // 2
+        x_start = WIDTH // 2 - 2 * piece_size + 30
+
+        for i, piece_char in enumerate(self.promotion_pieces):
+            piece = piece_char if self.board.white_to_move else piece_char.lower()
+            image = PIECE_IMAGES[piece]
+            x = x_start + i * (piece_size + 20)
+            rect = pygame.Rect(x, y, piece_size, piece_size)
+            SCREEN.blit(image, rect)
+            self.promotion_rects.append(rect)
 
     def parse_move(self, move_str):
-        from_square = algebraic_to_square(move_str[0:2])
-        to_square = algebraic_to_square(move_str[2:4])
-        promoted_piece = move_str[4].upper() if len(move_str) == 5 else None
+        if move_str in ['O-O', 'O-O-O']:
+            # Castling moves
+            if move_str == 'O-O':
+                if self.board.white_to_move:
+                    from_square = 4
+                    to_square = 6
+                else:
+                    from_square = 60
+                    to_square = 62
+            else:
+                if self.board.white_to_move:
+                    from_square = 4
+                    to_square = 2
+                else:
+                    from_square = 60
+                    to_square = 58
+            is_castling = True
+            promoted_piece = None
+        else:
+            from_square = algebraic_to_square(move_str[0:2])
+            to_square = algebraic_to_square(move_str[2:4])
+            promoted_piece = move_str[4].upper() if len(move_str) == 5 else None
+            is_castling = False
 
         if from_square is None or to_square is None:
             return None
@@ -273,18 +352,8 @@ class GUI:
         captured_piece = self.board.get_piece_at_square(to_square) if self.board.is_square_occupied_by_opponent(to_square) else None
 
         is_en_passant = False
-        is_castling = False
-
-        if piece.upper() == 'K' and abs(from_square - to_square) == 2:
-            is_castling = True
-
-        if promoted_piece and piece.upper() == 'P':
-            if promoted_piece in ['Q', 'R', 'B', 'N']:
-                pass
-            else:
-                return None
-        else:
-            promoted_piece = None
+        if piece.upper() == 'P' and to_square == self.board.en_passant_target:
+            is_en_passant = True
 
         move = Move(
             piece=piece,
@@ -299,9 +368,15 @@ class GUI:
         return move
 
     def update_move_tree(self, move, current_node, engine):
-        move_uci = square_to_algebraic(move.from_square) + square_to_algebraic(move.to_square)
-        if move.promoted_piece:
-            move_uci += f"={move.promoted_piece.upper()}"
+        if move.is_castling:
+            if move.to_square in [6, 62]:
+                move_uci = 'O-O'
+            else:
+                move_uci = 'O-O-O'
+        else:
+            move_uci = square_to_algebraic(move.from_square) + square_to_algebraic(move.to_square)
+            if move.promoted_piece:
+                move_uci += f"{move.promoted_piece.upper()}"
 
         if move_uci in current_node:
             return current_node[move_uci]
@@ -322,11 +397,17 @@ class ChessEngine:
         print("Falling back to Minimax algorithm for move selection.")
         best_move = find_best_move(board, max_depth)
         if best_move:
+            if best_move.is_castling:
+                if best_move.to_square in [6, 62]:
+                    return 'O-O'
+                else:
+                    return 'O-O-O'
             move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
             if best_move.promoted_piece:
-                move_str += f"={best_move.promoted_piece}"
+                move_str += f"{best_move.promoted_piece}"
             return move_str.lower()
         else:
+            # No legal moves, return None
             return None
 
 def main():
