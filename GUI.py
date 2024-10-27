@@ -319,7 +319,6 @@ class GUI:
 
     def parse_move(self, move_str):
         if move_str in ['O-O', 'O-O-O']:
-            # Castling moves
             if move_str == 'O-O':
                 if self.board.white_to_move:
                     from_square = 4
@@ -339,7 +338,7 @@ class GUI:
         else:
             from_square = algebraic_to_square(move_str[0:2])
             to_square = algebraic_to_square(move_str[2:4])
-            promoted_piece = move_str[4].upper() if len(move_str) == 5 else None
+            promoted_piece_char = move_str[4] if len(move_str) == 5 else None
             is_castling = False
 
         if from_square is None or to_square is None:
@@ -355,6 +354,15 @@ class GUI:
         if piece.upper() == 'P' and to_square == self.board.en_passant_target:
             is_en_passant = True
 
+        promoted_piece = None
+        if promoted_piece_char:
+            if piece.isupper():
+                #white pawn promoting
+                promoted_piece = promoted_piece_char.upper()
+            else:
+                #black pawn promoting
+                promoted_piece = promoted_piece_char.lower()
+
         move = Move(
             piece=piece,
             from_square=from_square,
@@ -366,6 +374,7 @@ class GUI:
         )
 
         return move
+
 
     def update_move_tree(self, move, current_node, engine):
         if move.is_castling:
