@@ -6,6 +6,7 @@ from board import Board, Move, square_to_algebraic
 from utils import algebraic_to_square
 import random
 from minimax import find_best_move
+from predict_move import MovePredictor
 
 pygame.init()
 
@@ -127,7 +128,7 @@ class GUI:
             return row * 8 + col
         return None
 
-    def main_loop(self, engine, current_node):
+    def main_loop(self, engine):
         while self.running:
             if not self.board.is_game_over():
                 self.draw_board()
@@ -149,13 +150,12 @@ class GUI:
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         pos = pygame.mouse.get_pos()
                         if self.promotion_move:
-                            # Handle promotion choice
                             for i, rect in enumerate(self.promotion_rects):
                                 if rect.collidepoint(pos):
                                     promoted_piece = self.promotion_pieces[i]
                                     self.promotion_move.promoted_piece = promoted_piece
                                     self.board.make_move(self.promotion_move)
-                                    current_node = self.update_move_tree(self.promotion_move, current_node, engine)
+                                    print(f"Promotion chosen: {promoted_piece}")
                                     self.promotion_move = None
                                     break
                         elif self.board.white_to_move:
@@ -167,40 +167,40 @@ class GUI:
                                     if piece and piece.isupper():
                                         self.selected_square = square
                                         self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                                        print(f"Selected square: {square_to_algebraic(square)} with piece {piece}")
                                 else:
                                     if square == self.selected_square:
-                                        # Deselect the piece if clicked again
+                                        print(f"Deselected square: {square_to_algebraic(square)}")
                                         self.selected_square = None
                                         self.valid_moves = []
                                     elif square in self.valid_moves:
-                                        # Proceed to make the move
                                         legal_moves = self.board.generate_legal_moves()
                                         move_found = False
                                         for legal_move in legal_moves:
                                             if legal_move.from_square == self.selected_square and legal_move.to_square == square:
                                                 if legal_move.promoted_piece:
-                                                    # Prompt for promotion piece
                                                     self.promotion_move = legal_move
+                                                    print(f"Move requires promotion: {legal_move}")
                                                 else:
                                                     self.board.make_move(legal_move)
-                                                    current_node = self.update_move_tree(legal_move, current_node, engine)
+                                                    print(f"Player moves: {legal_move}")
                                                 move_found = True
                                                 break
                                         if move_found:
                                             self.selected_square = None
                                             self.valid_moves = []
                                         else:
+                                            print("Invalid move attempted.")
                                             self.selected_square = None
                                             self.valid_moves = []
                                     else:
-                                        # Check if clicked on another of the player's own pieces to change selection
                                         piece = self.board.get_piece_at_square(square)
                                         if piece and piece.isupper():
                                             self.selected_square = square
                                             self.valid_moves = [move.to_square for move in self.board.generate_legal_moves() if move.from_square == square]
+                                            print(f"Changed selection to square: {square_to_algebraic(square)} with piece {piece}")
                                         else:
-                                            # Clicked on an invalid square; keep the current selection
-                                            pass
+                                            print(f"Clicked on invalid square: {square_to_algebraic(square)}")
 
                 if self.promotion_move:
                     self.draw_board()
@@ -210,24 +210,21 @@ class GUI:
                     continue
 
                 if not self.board.white_to_move and self.running:
-                    pygame.time.delay(500)
-                    ai_move = engine.get_ai_move(self.board, current_node, use_move_tree=True, max_depth=3)
+                    ai_move = engine.get_ai_move(self.board)
                     if ai_move:
-                        print(f"AI plays: {ai_move}")
+                        print(f"MovePredictor suggests: {ai_move}")
                         move_obj = self.parse_move(ai_move)
                         if move_obj:
                             self.board.make_move(move_obj)
-                            current_node = self.update_move_tree(move_obj, current_node, engine)
+                            print(f"AI plays: {ai_move}")
+                            print(f"AI moved: {move_obj}")
                         else:
                             print("AI selected an invalid move.")
-                            # Do not set self.running = False; let the game detect the end
                     else:
                         print("AI has no legal moves.")
-                        # Do not set self.running = False; let the game detect the end
 
                 pygame.display.flip()
             else:
-                # Game is over
                 self.draw_board()
                 self.draw_pieces()
                 self.display_game_over()
@@ -240,11 +237,10 @@ class GUI:
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         pos = pygame.mouse.get_pos()
                         if self.play_again_rect.collidepoint(pos):
-                            # Restart the game
+                            print("Restarting game.")
                             self.restart_game()
-                            current_node = engine.move_tree
                         elif self.exit_rect.collidepoint(pos):
-                            # Exit the game
+                            print("Exiting game.")
                             self.running = False
                             pygame.quit()
                             sys.exit()
@@ -268,19 +264,16 @@ class GUI:
         text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
         SCREEN.blit(text, text_rect)
 
-        # Add "Play Again" button
         play_again_text = FONT.render("Play Again", True, (255, 255, 255))
         play_again_rect = play_again_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
         pygame.draw.rect(SCREEN, (0, 128, 0), play_again_rect.inflate(20, 10))
         SCREEN.blit(play_again_text, play_again_rect)
 
-        # Add "Exit" button
         exit_text = FONT.render("Exit", True, (255, 255, 255))
         exit_rect = exit_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 80))
         pygame.draw.rect(SCREEN, (128, 0, 0), exit_rect.inflate(20, 10))
         SCREEN.blit(exit_text, exit_rect)
 
-        # Store the rects to detect clicks
         self.play_again_rect = play_again_rect
         self.exit_rect = exit_rect
 
@@ -294,6 +287,7 @@ class GUI:
         self.king_square = None
         self.promotion_move = None
         self.promotion_rects = []
+        print("Game has been restarted.")
 
     def draw_promotion_choices(self):
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -311,30 +305,32 @@ class GUI:
 
         for i, piece_char in enumerate(self.promotion_pieces):
             piece = piece_char if self.board.white_to_move else piece_char.lower()
-            image = PIECE_IMAGES[piece]
-            x = x_start + i * (piece_size + 20)
-            rect = pygame.Rect(x, y, piece_size, piece_size)
-            SCREEN.blit(image, rect)
-            self.promotion_rects.append(rect)
+            image = PIECE_IMAGES.get(piece)
+            if image:
+                x = x_start + i * (piece_size + 20)
+                rect = pygame.Rect(x, y, piece_size, piece_size)
+                SCREEN.blit(image, rect)
+                self.promotion_rects.append(rect)
 
     def parse_move(self, move_str):
+        promoted_piece_char = None
+
         if move_str in ['O-O', 'O-O-O']:
             if move_str == 'O-O':
-                if self.board.white_to_move:
-                    from_square = 4
-                    to_square = 6
-                else:
-                    from_square = 60
+                if not self.board.white_to_move:
+                    from_square = 60  # Black King
                     to_square = 62
-            else:
-                if self.board.white_to_move:
-                    from_square = 4
-                    to_square = 2
                 else:
-                    from_square = 60
+                    from_square = 4  # White King
+                    to_square = 6
+            else:
+                if not self.board.white_to_move:
+                    from_square = 60  # Black King
                     to_square = 58
+                else:
+                    from_square = 4  # White King
+                    to_square = 2
             is_castling = True
-            promoted_piece = None
         else:
             from_square = algebraic_to_square(move_str[0:2])
             to_square = algebraic_to_square(move_str[2:4])
@@ -342,10 +338,12 @@ class GUI:
             is_castling = False
 
         if from_square is None or to_square is None:
+            print(f"Invalid move string: {move_str}")
             return None
 
         piece = self.board.get_piece_at_square(from_square)
         if piece is None:
+            print(f"No piece at from_square: {square_to_algebraic(from_square)}")
             return None
 
         captured_piece = self.board.get_piece_at_square(to_square) if self.board.is_square_occupied_by_opponent(to_square) else None
@@ -357,10 +355,8 @@ class GUI:
         promoted_piece = None
         if promoted_piece_char:
             if piece.isupper():
-                #white pawn promoting
                 promoted_piece = promoted_piece_char.upper()
             else:
-                #black pawn promoting
                 promoted_piece = promoted_piece_char.lower()
 
         move = Move(
@@ -373,66 +369,44 @@ class GUI:
             is_castling=is_castling
         )
 
+        print(f"Parsed move: {move}")
         return move
 
-
-    def update_move_tree(self, move, current_node, engine):
-        if move.is_castling:
-            if move.to_square in [6, 62]:
-                move_uci = 'O-O'
-            else:
-                move_uci = 'O-O-O'
-        else:
-            move_uci = square_to_algebraic(move.from_square) + square_to_algebraic(move.to_square)
-            if move.promoted_piece:
-                move_uci += f"{move.promoted_piece.upper()}"
-
-        if move_uci in current_node:
-            return current_node[move_uci]
-        else:
-            return {}
-
 class ChessEngine:
-    def __init__(self, move_tree):
-        self.move_tree = move_tree
+    def __init__(self):
+        self.move_predictor = MovePredictor()
 
-    def get_ai_move(self, board, current_node, use_move_tree=True, max_depth=3):
-        if use_move_tree and current_node:
-            possible_moves = list(current_node.keys())
-            if possible_moves:
-                selected_move = random.choice(possible_moves)
-                return selected_move
-
-        print("Falling back to Minimax algorithm for move selection.")
-        best_move = find_best_move(board, max_depth)
-        if best_move:
-            if best_move.is_castling:
-                if best_move.to_square in [6, 62]:
-                    return 'O-O'
+    def get_ai_move(self, board: Board):
+        if not board.white_to_move:
+            move = board.suggest_move()
+            if move:
+                print(f"MovePredictor suggests: {move}")
+                return str(move)
+            else:
+                print("No suggestion from MovePredictor, falling back to Minimax.")
+                best_move = find_best_move(board, max_depth=3)
+                if best_move:
+                    if best_move.is_castling:
+                        if best_move.to_square in [6, 62]:
+                            return 'O-O'
+                        else:
+                            return 'O-O-O'
+                    move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
+                    if best_move.promoted_piece:
+                        move_str += f"{best_move.promoted_piece}"
+                    print(f"Minimax selects: {move_str}")
+                    return move_str.lower()
                 else:
-                    return 'O-O-O'
-            move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
-            if best_move.promoted_piece:
-                move_str += f"{best_move.promoted_piece}"
-            return move_str.lower()
+                    print("Minimax found no legal moves.")
+                    return None
         else:
-            # No legal moves, return None
             return None
 
 def main():
-    move_tree_path = r"C:\Users\firefly\Desktop\Chess\pgns\chess_opening_tree2.json"
-
-    try:
-        with open(move_tree_path, 'r') as f:
-            move_tree = json.load(f)
-    except FileNotFoundError:
-        print(f"Move tree file not found at {move_tree_path}. Please ensure the file exists.")
-        sys.exit()
-
-    engine = ChessEngine(move_tree)
+    engine = ChessEngine()
     board = Board()
     gui = GUI(board)
-    gui.main_loop(engine, move_tree)
+    gui.main_loop(engine)
 
 if __name__ == "__main__":
     main()

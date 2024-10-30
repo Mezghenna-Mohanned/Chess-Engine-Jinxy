@@ -18,17 +18,17 @@ class MovePredictor:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
 
-        self.model = ChessMovePredictor(input_size=768, hidden_sizes=[1024, 512, 256], output_size=self.num_moves)
+        self.model = ChessMovePredictor(input_size=832, hidden_sizes=[1024, 512, 256], output_size=self.num_moves)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.to(self.device)
         self.model.eval()
 
     def fen_to_features(self, fen):
         """
-        Converts a FEN string to a numerical feature array.
+        Converts a FEN string to a numerical feature array, including active color.
         """
         board = chess.Board(fen)
-        feature = np.zeros((8, 8, 12), dtype=np.float32)
+        feature = np.zeros((8, 8, 13), dtype=np.float32)  # 12 for pieces + 1 for active color
         piece_to_index = {
             'P': 0, 'N': 1, 'B': 2, 'R': 3, 'Q': 4, 'K': 5,
             'p': 6, 'n': 7, 'b': 8, 'r': 9, 'q': 10, 'k': 11
@@ -38,6 +38,8 @@ class MovePredictor:
             col = square % 8
             piece_idx = piece_to_index[piece.symbol()]
             feature[row, col, piece_idx] = 1
+        active_color = 1 if board.turn == chess.WHITE else 0
+        feature[:, :, 12] = active_color
         return feature.flatten()
 
     def predict_move(self, fen):
@@ -51,7 +53,7 @@ class MovePredictor:
         - str or None: Predicted move in UCI format, or None if prediction fails.
         """
         features = self.fen_to_features(fen)
-        features = torch.tensor(features, dtype=torch.float32).unsqueeze(0).to(self.device)  # Add batch dimension
+        features = torch.tensor(features, dtype=torch.float32).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             outputs = self.model(features)

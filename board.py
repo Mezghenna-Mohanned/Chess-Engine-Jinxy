@@ -1,7 +1,8 @@
 from constants import INITIAL_POSITIONS, FILE_MASKS
 import random
-
-from utils import algebraic_to_square
+import json
+from utils import algebraic_to_square, square_to_algebraic
+from predict_move import MovePredictor
 
 class Board:
     def __init__(self):
@@ -33,6 +34,8 @@ class Board:
         self.zobrist_en_passant_keys = [random.getrandbits(64) for _ in range(8)]
         self.zobrist_side_key = random.getrandbits(64)
         self.zobrist_hash = self.compute_zobrist_hash()
+
+        self.move_predictor = MovePredictor()
 
     def compute_zobrist_hash(self):
         zobrist_hash = 0
@@ -340,9 +343,9 @@ class Board:
         moves = []
         direction = 8 if piece.isupper() else -8
         start_rank = 1 if piece.isupper() else 6
+        promotion_rank = 7 if piece.isupper() else 0
         enemy_pieces = self.occupied_black if piece.isupper() else self.occupied_white
         own_pieces = self.occupied_white if piece.isupper() else self.occupied_black
-        promotion_rank = 7 if piece.isupper() else 0
 
         for capture_direction in [-1, 1]:
             to_square = from_square + direction + capture_direction
@@ -376,6 +379,7 @@ class Board:
         if attacks_only:
             return moves
 
+        # Forward move
         to_square = from_square + direction
         if 0 <= to_square < 64 and not (self.occupied & (1 << to_square)):
             is_promotion = to_square // 8 == promotion_rank
@@ -388,6 +392,7 @@ class Board:
                     ))
             else:
                 moves.append(Move(piece, from_square, to_square))
+                # Double move from starting position
                 if from_square // 8 == start_rank:
                     to_square2 = from_square + 2 * direction
                     if not (self.occupied & (1 << to_square2)) and not (self.occupied & (1 << (from_square + direction))):
@@ -420,7 +425,6 @@ class Board:
             while True:
                 to_square += direction
                 if 0 <= to_square < 64:
-
                     from_rank = from_square // 8
                     from_file = from_square % 8
                     to_rank = to_square // 8
@@ -448,7 +452,6 @@ class Board:
             while True:
                 to_square += direction
                 if 0 <= to_square < 64:
-
                     if direction in [1, -1]:
                         from_rank = from_square // 8
                         to_rank = to_square // 8
@@ -581,6 +584,79 @@ class Board:
             self.zobrist_hash ^= self.zobrist_piece_keys[piece][to_square]
             self.zobrist_hash ^= self.zobrist_piece_keys[piece][from_square]
 
+    def generate_fen(self):
+        fen = ""
+        for rank in range(7, -1, -1):
+            empty = 0
+            for file in range(8):
+                square = rank * 8 + file
+                piece = self.get_piece_at_square(square)
+                if piece:
+                    if empty > 0:
+                        fen += str(empty)
+                        empty = 0
+                    fen += piece
+                else:
+                    empty += 1
+            if empty > 0:
+                fen += str(empty)
+            if rank != 0:
+                fen += '/'
+        fen += ' ' + ('w' if self.white_to_move else 'b')
+        castling = ''
+        for c in ['K', 'Q', 'k', 'q']:
+            if self.castling_rights.get(c, False):
+                castling += c
+        fen += ' ' + (castling if castling else '-')
+        fen += ' ' + (square_to_algebraic(self.en_passant_target) if self.en_passant_target is not None else '-')
+        fen += f' {self.halfmove_clock}'
+        fen += f' {self.fullmove_number}'
+
+        print(f"Generated FEN: {fen}")
+        return fen
+
+
+    def uci_to_move(self, uci_move):
+        """
+        Converts a UCI move string to a Move object.
+        """
+        from_sq = algebraic_to_square(uci_move[:2])
+        to_sq = algebraic_to_square(uci_move[2:4])
+        promoted_piece = uci_move[4] if len(uci_move) > 4 else None
+        piece = self.get_piece_at_square(from_sq)
+        captured_piece = self.get_piece_at_square(to_sq)
+        is_castling = False
+        is_en_passant = False
+
+        if piece.upper() == 'K' and abs(to_sq - from_sq) == 2:
+            is_castling = True
+
+        if piece.upper() == 'P' and to_sq == self.en_passant_target:
+            is_en_passant = True
+            captured_piece = 'p' if self.white_to_move else 'P'
+
+        move = Move(
+            piece=piece,
+            from_square=from_sq,
+            to_square=to_sq,
+            captured_piece=captured_piece,
+            promoted_piece=promoted_piece.upper() if promoted_piece else None,
+            is_en_passant=is_en_passant,
+            is_castling=is_castling
+        )
+        return move
+
+    def suggest_move(self):
+        """
+        Uses the MovePredictor to suggest the best move based on the current board state.
+        """
+        fen = self.generate_fen()
+        predicted_move_str = self.move_predictor.predict_move(fen)
+        if predicted_move_str:
+            move = self.uci_to_move(predicted_move_str)
+            return move
+        return None
+
     def evaluate(self):
         from evaluation import evaluate
         return evaluate(self)
@@ -636,10 +712,3 @@ class Move:
             elif self.to_square in [2, 58]:
                 move_str = "O-O-O"
         return move_str
-
-def square_to_algebraic(square):
-    files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-    rank = square // 8 + 1
-    file = square % 8
-    return f"{files[file]}{rank}"
-
