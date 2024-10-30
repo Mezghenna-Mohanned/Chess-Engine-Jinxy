@@ -1,6 +1,8 @@
 # Chess AI Project
 
-![Chess AI Logo](images/logo.png)
+<div align="center">
+  <img src="images/logo.png" alt="Chess AI Logo" width="200"/>
+</div>
 
 Welcome to the **Chess AI Project**! This project integrates a sophisticated machine learning-based artificial intelligence (AI) with a user-friendly graphical user interface (GUI) built using Pygame. The goal is to provide an engaging and challenging chess-playing experience where users can compete against an AI opponent capable of making intelligent and strategic moves based on a trained neural network model.
 
