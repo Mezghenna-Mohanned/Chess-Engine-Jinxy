@@ -42,12 +42,13 @@ class MovePredictor:
         feature[:, :, 12] = active_color
         return feature.flatten()
 
-    def predict_move(self, fen):
+    def predict_move(self, fen, legal_moves):
         """
-        Predicts the best move given the current board state.
+        Predicts the best move given the current board state, ensuring it's legal.
 
         Parameters:
         - fen (str): FEN string of the current board state.
+        - legal_moves (list of Move objects): List of currently legal moves.
 
         Returns:
         - str or None: Predicted move in UCI format, or None if prediction fails.
@@ -61,4 +62,14 @@ class MovePredictor:
             top_move_idx = torch.argmax(probabilities, dim=1).item()
             predicted_move = self.int_to_move.get(top_move_idx, None)
 
-        return predicted_move
+        # tvalidi if the predicted move is legal
+        if predicted_move and self.is_move_legal(predicted_move, legal_moves):
+            return predicted_move
+        else:
+            return None
+
+    def is_move_legal(self, move_str, legal_moves):
+        for move in legal_moves:
+            if str(move) == move_str:
+                return True
+        return False

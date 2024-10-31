@@ -212,14 +212,20 @@ class GUI:
                 if not self.board.white_to_move and self.running:
                     ai_move = engine.get_ai_move(self.board)
                     if ai_move:
-                        print(f"MovePredictor suggests: {ai_move}")
+                        print(f"AI suggests: {ai_move}")
                         move_obj = self.parse_move(ai_move)
-                        if move_obj:
+                        if move_obj and move_obj in self.board.generate_legal_moves():
                             self.board.make_move(move_obj)
                             print(f"AI plays: {ai_move}")
                             print(f"AI moved: {move_obj}")
                         else:
-                            print("AI selected an invalid move.")
+                            print("AI selected an invalid move. Selecting a legal move using Minimax.")
+                            best_move = find_best_move(self.board, max_depth=3)
+                            if best_move:
+                                self.board.make_move(best_move)
+                                print(f"Minimax selects: {best_move}")
+                            else:
+                                print("Minimax found no legal moves.")
                     else:
                         print("AI has no legal moves.")
 
@@ -379,11 +385,11 @@ class ChessEngine:
     def get_ai_move(self, board: Board):
         if not board.white_to_move:
             move = board.suggest_move()
-            if move:
+            if move and move in board.generate_legal_moves():
                 print(f"MovePredictor suggests: {move}")
                 return str(move)
             else:
-                print("No suggestion from MovePredictor, falling back to Minimax.")
+                print("MovePredictor suggested an invalid move, falling back to Minimax.")
                 best_move = find_best_move(board, max_depth=3)
                 if best_move:
                     if best_move.is_castling:

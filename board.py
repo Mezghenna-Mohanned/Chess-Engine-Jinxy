@@ -101,7 +101,7 @@ class Board:
         self.bitboards[piece] &= ~(1 << from_square)
         self.zobrist_hash ^= self.zobrist_piece_keys[piece][from_square]
 
-        captured_piece = self.get_piece_at_square(to_square) if self.occupied & (1 << to_square) else None
+        captured_piece = self.get_piece_at_square(to_square) if self.is_square_occupied_by_opponent(to_square) else None
 
         if captured_piece:
             self.bitboards[captured_piece] &= ~(1 << to_square)
@@ -615,7 +615,6 @@ class Board:
         print(f"Generated FEN: {fen}")
         return fen
 
-
     def uci_to_move(self, uci_move):
         """
         Converts a UCI move string to a Move object.
@@ -649,12 +648,17 @@ class Board:
     def suggest_move(self):
         """
         Uses the MovePredictor to suggest the best move based on the current board state.
+        Ensures the suggested move is legal.
         """
         fen = self.generate_fen()
-        predicted_move_str = self.move_predictor.predict_move(fen)
+        legal_moves = self.generate_legal_moves()
+        predicted_move_str = self.move_predictor.predict_move(fen, legal_moves)
         if predicted_move_str:
             move = self.uci_to_move(predicted_move_str)
-            return move
+            if move and move in legal_moves:
+                return move
+            else:
+                print(f"Suggested move {predicted_move_str} is illegal.")
         return None
 
     def evaluate(self):
