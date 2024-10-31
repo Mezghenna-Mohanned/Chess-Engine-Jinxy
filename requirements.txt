@@ -1,0 +1,5 @@
+pygame==2.1.2
+python-chess==1.999
+torch==2.4.1
+tqdm==4.66.2
+numpy==1.26.4
