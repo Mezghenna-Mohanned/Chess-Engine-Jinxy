@@ -3,6 +3,8 @@ import random
 import json
 from utils import algebraic_to_square, square_to_algebraic
 from predict_move import MovePredictor
+from minimax import find_best_move
+from evaluation import evaluate
 
 class Board:
     def __init__(self):
@@ -647,22 +649,34 @@ class Board:
 
     def suggest_move(self):
         """
-        Uses the MovePredictor to suggest the best move based on the current board state.
-        Ensures the suggested move is legal.
+        Uses both MovePredictor and Minimax to suggest the best move.
+        The AI first attempts to use the MovePredictor. If the predicted move
+        is invalid or suboptimal, it falls back to using Minimax.
+        Returns:
+            Move or None: The best move found.
         """
         fen = self.generate_fen()
         legal_moves = self.generate_legal_moves()
+
         predicted_move_str = self.move_predictor.predict_move(fen, legal_moves)
         if predicted_move_str:
             move = self.uci_to_move(predicted_move_str)
             if move and move in legal_moves:
+                print(f"MovePredictor suggests: {move}")
                 return move
             else:
-                print(f"Suggested move {predicted_move_str} is illegal.")
-        return None
+                print(f"MovePredictor suggests: {predicted_move_str} (Invalid Move)")
 
-    def evaluate(self):
-        from evaluation import evaluate
+        print("MovePredictor did not suggest a valid move. Falling back to Minimax.")
+        best_move = find_best_move(self, max_depth=4, time_limit=5.0)
+        if best_move:
+            print(f"Minimax selects: {best_move}")
+            return best_move
+        else:
+            print("Minimax found no legal moves.")
+            return None
+
+    def evaluate_board(self):
         return evaluate(self)
 
 class Move:

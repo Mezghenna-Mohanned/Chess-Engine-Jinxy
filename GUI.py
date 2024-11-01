@@ -129,6 +129,7 @@ class GUI:
         return None
 
     def main_loop(self, engine):
+        clock = pygame.time.Clock()
         while self.running:
             if not self.board.is_game_over():
                 self.draw_board()
@@ -220,7 +221,7 @@ class GUI:
                             print(f"AI moved: {move_obj}")
                         else:
                             print("AI selected an invalid move. Selecting a legal move using Minimax.")
-                            best_move = find_best_move(self.board, max_depth=3)
+                            best_move = find_best_move(self.board, max_depth=4, time_limit=5.0)  # Increased depth for better analysis
                             if best_move:
                                 self.board.make_move(best_move)
                                 print(f"Minimax selects: {best_move}")
@@ -230,6 +231,7 @@ class GUI:
                         print("AI has no legal moves.")
 
                 pygame.display.flip()
+                clock.tick(60)
             else:
                 self.draw_board()
                 self.draw_pieces()
@@ -252,8 +254,12 @@ class GUI:
                             sys.exit()
 
                 pygame.display.flip()
+                clock.tick(60)
 
     def display_game_over(self):
+        """
+        Displays the game over screen with options to play again or exit.
+        """
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         SCREEN.blit(overlay, (0, 0))
@@ -286,6 +292,9 @@ class GUI:
         pygame.display.flip()
 
     def restart_game(self):
+        """
+        Restarts the game by reinitializing the board and resetting UI elements.
+        """
         self.board = Board()
         self.selected_square = None
         self.valid_moves = []
@@ -296,6 +305,9 @@ class GUI:
         print("Game has been restarted.")
 
     def draw_promotion_choices(self):
+        """
+        Displays the promotion choices when a pawn reaches the last rank.
+        """
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         SCREEN.blit(overlay, (0, 0))
@@ -319,6 +331,9 @@ class GUI:
                 self.promotion_rects.append(rect)
 
     def parse_move(self, move_str):
+        """
+        Converts a UCI move string into a Move object.
+        """
         promoted_piece_char = None
 
         if move_str in ['O-O', 'O-O-O']:
@@ -337,11 +352,13 @@ class GUI:
                     from_square = 4  # White King
                     to_square = 2
             is_castling = True
+            captured_piece = None
         else:
             from_square = algebraic_to_square(move_str[0:2])
             to_square = algebraic_to_square(move_str[2:4])
             promoted_piece_char = move_str[4] if len(move_str) == 5 else None
             is_castling = False
+            captured_piece = self.board.get_piece_at_square(to_square) if self.board.is_square_occupied_by_opponent(to_square) else None
 
         if from_square is None or to_square is None:
             print(f"Invalid move string: {move_str}")
@@ -352,11 +369,10 @@ class GUI:
             print(f"No piece at from_square: {square_to_algebraic(from_square)}")
             return None
 
-        captured_piece = self.board.get_piece_at_square(to_square) if self.board.is_square_occupied_by_opponent(to_square) else None
-
         is_en_passant = False
         if piece.upper() == 'P' and to_square == self.board.en_passant_target:
             is_en_passant = True
+            captured_piece = 'p' if self.board.white_to_move else 'P'
 
         promoted_piece = None
         if promoted_piece_char:
@@ -383,6 +399,10 @@ class ChessEngine:
         self.move_predictor = MovePredictor()
 
     def get_ai_move(self, board: Board):
+        """
+        Determines the AI's move by first attempting the MovePredictor.
+        If the suggested move is invalid or suboptimal, falls back to Minimax.
+        """
         if not board.white_to_move:
             move = board.suggest_move()
             if move and move in board.generate_legal_moves():
@@ -390,18 +410,19 @@ class ChessEngine:
                 return str(move)
             else:
                 print("MovePredictor suggested an invalid move, falling back to Minimax.")
-                best_move = find_best_move(board, max_depth=3)
+                best_move = find_best_move(board, max_depth=6, time_limit=5.0)  # increased depth for better analysis
                 if best_move:
                     if best_move.is_castling:
                         if best_move.to_square in [6, 62]:
-                            return 'O-O'
+                            move_str = 'O-O'
                         else:
-                            return 'O-O-O'
-                    move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
-                    if best_move.promoted_piece:
-                        move_str += f"{best_move.promoted_piece}"
+                            move_str = 'O-O-O'
+                    else:
+                        move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
+                        if best_move.promoted_piece:
+                            move_str += f"{best_move.promoted_piece}"
                     print(f"Minimax selects: {move_str}")
-                    return move_str.lower()
+                    return move_str
                 else:
                     print("Minimax found no legal moves.")
                     return None

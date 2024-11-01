@@ -67,6 +67,10 @@ PIECE_SQUARE_TABLES = {
 
 @lru_cache(maxsize=None)
 def evaluate(board):
+    """
+    Evaluates the board state and returns a score from the perspective of the player to move.
+    Positive scores favor White, negative scores favor Black.
+    """
     score = 0
     material_score = 0
     positional_score = 0
@@ -106,12 +110,10 @@ def evaluate(board):
                 positional_score += np.sum(positional_values)
             if piece.upper() in ('N', 'B'):
                 piece_counts[piece] += len(squares)
-            if piece.upper() == 'Q':
-                queen_mobility_score = evaluate_mobility(board, piece, squares)
-                mobility_score += queen_mobility_score
-            else:
-                mobility_score += evaluate_mobility(board, piece, squares)
+            mobility_score += evaluate_mobility(board, piece, squares)
+
             space_score += evaluate_space(piece, squares)
+    
     if piece_counts['B'] >= 2:
         bishop_pair_score += 50
     if piece_counts['b'] >= 2:
@@ -124,14 +126,23 @@ def evaluate(board):
     opponent_mobility = len(opponent_moves)
     board.white_to_move = not board.white_to_move
     mobility_score += own_mobility - opponent_mobility
+
     king_safety_score = evaluate_king_safety(board)
+
     pawn_structure_score = evaluate_pawn_structure(board)
+
     center_control_score = evaluate_center_control(board)
+
     piece_coordination_score = evaluate_piece_coordination(board)
+
     passed_pawn_score = evaluate_passed_pawns(board)
+
     threats_score = evaluate_threats(board, own_moves)
+
     opponent_weaknesses_score = evaluate_opponent_weaknesses(board)
+
     development_score = evaluate_development(board)
+
     exchange_score = evaluate_exchanges(board)
 
     score = (material_score +
@@ -161,6 +172,9 @@ def evaluate(board):
     return score
 
 def get_game_phase(board):
+    """
+    Determines the current phase of the game based on material.
+    """
     total_material = 0
     for piece, bitboard in board.bitboards.items():
         if piece.upper() != 'K':
@@ -174,6 +188,9 @@ def get_game_phase(board):
         return 'endgame'
 
 def evaluate_mobility(board, piece, squares):
+    """
+    Counts the number of legal moves available to a piece for mobility evaluation.
+    """
     mobility = 0
     for square in squares:
         moves = board.generate_piece_moves(piece, square)
@@ -181,15 +198,21 @@ def evaluate_mobility(board, piece, squares):
     return mobility
 
 def evaluate_space(piece, squares):
+    """
+    Evaluates space control based on piece positions.
+    """
     score = 0
     ranks = np.array(squares) // 8
     if piece.isupper():
-        score += np.sum(ranks >= 4) * 5
+        score += np.sum(ranks >= 4) * 5  # Encourages advancing pieces
     else:
         score += np.sum(ranks <= 3) * 5
     return score
 
 def evaluate_king_safety(board):
+    """
+    Evaluates the safety of the king based on surrounding pieces and enemy threats.
+    """
     score = 0
     own_king_square = board.find_king_square(board.white_to_move)
     if own_king_square is None:
@@ -205,6 +228,9 @@ def evaluate_king_safety(board):
     return score
 
 def get_king_attack_zones(king_square):
+    """
+    Returns a set of squares that are adjacent to the king for threat evaluation.
+    """
     adjacent = get_adjacent_squares(king_square)
     extended_zone = set(adjacent)
     for square in adjacent:
@@ -212,6 +238,10 @@ def get_king_attack_zones(king_square):
     return extended_zone
 
 def evaluate_king_pawn_shield(board, king_square, is_white):
+    """
+    Evaluates the pawn shield around the king.
+    Penalizes missing pawns around the king.
+    """
     score = 0
     rank = king_square // 8
     file = king_square % 8
@@ -229,6 +259,9 @@ def evaluate_king_pawn_shield(board, king_square, is_white):
     return score
 
 def evaluate_open_files_to_king(board, king_square, is_white):
+    """
+    Penalizes enemy control over open files near the king.
+    """
     score = 0
     file = king_square % 8
     enemy_rooks_queens = board.bitboards.get('r' if is_white else 'R', 0) | board.bitboards.get('q' if is_white else 'Q', 0)
@@ -239,6 +272,9 @@ def evaluate_open_files_to_king(board, king_square, is_white):
     return score
 
 def get_piece_attack_weight(piece):
+    """
+    Assigns weights based on the type of piece threatening the king.
+    """
     if piece.upper() == 'P':
         return 1
     if piece.upper() in ('N', 'B'):
@@ -250,6 +286,9 @@ def get_piece_attack_weight(piece):
     return 0
 
 def evaluate_pawn_structure(board):
+    """
+    Evaluates the pawn structure for potential weaknesses or strengths.
+    """
     score = 0
     white_pawns = board.bitboards.get('P', 0)
     black_pawns = board.bitboards.get('p', 0)
@@ -260,6 +299,9 @@ def evaluate_pawn_structure(board):
     return score
 
 def evaluate_pawn_weaknesses(board, pawns):
+    """
+    Evaluates pawn weaknesses such as doubled and isolated pawns.
+    """
     score = 0
     files = [i % 8 for i in range(64) if pawns & (1 << i)]
     unique_files = set(files)
@@ -277,6 +319,10 @@ def evaluate_pawn_weaknesses(board, pawns):
     return score
 
 def evaluate_pawn_islands(pawns):
+    """
+    Evaluates the number of pawn islands (clusters of pawns on adjacent files).
+    """
+    score = 0
     files = [i % 8 for i in range(64) if pawns & (1 << i)]
     if not files:
         return 0
@@ -288,6 +334,9 @@ def evaluate_pawn_islands(pawns):
     return -pawn_islands * 15
 
 def evaluate_center_control(board):
+    """
+    Evaluates control over the central squares.
+    """
     score = 0
     central_squares = [18, 19, 20, 21, 26, 27, 28, 29, 34, 35, 36, 37, 42, 43, 44, 45]
     own_pieces = 'PNBRQK' if board.white_to_move else 'pnbrqk'
@@ -304,6 +353,9 @@ def evaluate_center_control(board):
     return score
 
 def evaluate_piece_coordination(board):
+    """
+    Evaluates how well pieces are coordinating with each other.
+    """
     score = 0
     own_pieces = 'PNBRQK' if board.white_to_move else 'pnbrqk'
     for piece in own_pieces:
@@ -319,6 +371,9 @@ def evaluate_piece_coordination(board):
     return score
 
 def evaluate_passed_pawns(board):
+    """
+    Evaluates the presence of passed pawns.
+    """
     score = 0
     white_pawns = board.bitboards.get('P', 0)
     black_pawns = board.bitboards.get('p', 0)
@@ -327,6 +382,9 @@ def evaluate_passed_pawns(board):
     return score
 
 def evaluate_passed_pawns_for_color(board, own_pawns, enemy_pawns, is_white):
+    """
+    Counts and scores passed pawns for a given color.
+    """
     score = 0
     own_pawn_squares = [i for i in range(64) if own_pawns & (1 << i)]
     for square in own_pawn_squares:
@@ -340,6 +398,9 @@ def evaluate_passed_pawns_for_color(board, own_pawns, enemy_pawns, is_white):
     return score
 
 def is_pawn_passed(square, enemy_pawns, is_white):
+    """
+    Determines if a pawn is passed.
+    """
     file = square % 8
     rank = square // 8
     direction = 1 if is_white else -1
@@ -355,6 +416,9 @@ def is_pawn_passed(square, enemy_pawns, is_white):
     return True
 
 def is_protected_passed_pawn(board, square, is_white):
+    """
+    Checks if a passed pawn is protected by a friendly pawn.
+    """
     file = square % 8
     rank = square // 8
     pawn_piece = 'P' if is_white else 'p'
@@ -369,6 +433,9 @@ def is_protected_passed_pawn(board, square, is_white):
     return False
 
 def evaluate_threats(board, own_moves):
+    """
+    Evaluates threats posed by own pieces.
+    """
     score = 0
     for move in own_moves:
         if board.is_capture_move(move):
@@ -377,16 +444,22 @@ def evaluate_threats(board, own_moves):
             trade_gain = captured_value - attacker_value
             score += trade_gain
         elif is_threatening_move(board, move):
-            score += 15
+            score += 15  # Reward moves that threaten enemy pieces
     return score
 
 def is_threatening_move(board, move):
+    """
+    Determines if a move is threatening an enemy piece.
+    """
     target_piece = board.get_piece_at_square(move.to_square)
     if target_piece and target_piece.islower() != move.piece.islower():
         return True
     return False
 
 def evaluate_opponent_weaknesses(board):
+    """
+    Evaluates weaknesses in the opponent's position.
+    """
     score = 0
     enemy_pieces = 'pnbrqk' if board.white_to_move else 'PNBRQK'
     for piece in enemy_pieces:
@@ -395,10 +468,13 @@ def evaluate_opponent_weaknesses(board):
             squares = [i for i in range(64) if bitboard & (1 << i)]
             for square in squares:
                 if is_piece_undefended(board, square):
-                    score += 20
+                    score += 20  # Penalize opponent's undefended pieces
     return score
 
 def is_piece_undefended(board, square):
+    """
+    Checks if a piece at a given square is undefended.
+    """
     own_pieces = 'PNBRQK' if board.white_to_move else 'pnbrqk'
     for piece in own_pieces:
         bitboard = board.bitboards.get(piece, 0)
@@ -411,6 +487,10 @@ def is_piece_undefended(board, square):
     return True
 
 def evaluate_development(board):
+    """
+    Rewards pieces that are developed (not on their starting squares).
+    Penalizes undeveloped pieces.
+    """
     score = 0
     own_pieces = 'PNBRQ' if board.white_to_move else 'pnbrq'
     starting_rank = 0 if board.white_to_move else 7
@@ -425,14 +505,20 @@ def evaluate_development(board):
     return score
 
 def evaluate_endgame(board):
+    """
+    Additional evaluation for the endgame phase.
+    """
     score = 0
     own_king_square = board.find_king_square(board.white_to_move)
     enemy_king_square = board.find_king_square(not board.white_to_move)
     own_king_distance = manhattan_distance(own_king_square, enemy_king_square)
-    score += (14 - own_king_distance) * 10
+    score += (14 - own_king_distance) * 10  # Encourage bringing the king towards the center
     return score
 
 def manhattan_distance(sq1, sq2):
+    """
+    Calculates the Manhattan distance between two squares.
+    """
     if sq1 is None or sq2 is None:
         return 0
     rank1, file1 = divmod(sq1, 8)
@@ -440,6 +526,9 @@ def manhattan_distance(sq1, sq2):
     return abs(rank1 - rank2) + abs(file1 - file2)
 
 def evaluate_exchanges(board):
+    """
+    Evaluates the exchanges (trades) on the board.
+    """
     score = 0
     own_pieces = 'PNBRQK' if board.white_to_move else 'pnbrqk'
     enemy_pieces = 'pnbrqk' if board.white_to_move else 'PNBRQK'
@@ -458,6 +547,9 @@ def evaluate_exchanges(board):
     return score
 
 def get_attackers(board, square, by_white):
+    """
+    Retrieves a list of attackers on a given square.
+    """
     attackers = []
     attacking_pieces = 'PNBRQK' if by_white else 'pnbrqk'
     for piece in attacking_pieces:
@@ -471,6 +563,9 @@ def get_attackers(board, square, by_white):
     return attackers
 
 def static_exchange_evaluation(board, piece_value, attackers, defenders):
+    """
+    Performs Static Exchange Evaluation (SEE) to assess the outcome of exchanges on a square.
+    """
     if board.white_to_move:
         attackers_white = defenders
         attackers_black = attackers
@@ -489,6 +584,7 @@ def static_exchange_evaluation(board, piece_value, attackers, defenders):
         gain = abs(attacker['value'])
         material_swings.append(gain if side == 0 else -gain)
         side = 1 - side
+
     for i in range(len(material_swings) - 2, -1, -1):
         material_swings[i] = -material_swings[i + 1] - material_swings[i]
     if side_to_move == 0:
@@ -497,6 +593,9 @@ def static_exchange_evaluation(board, piece_value, attackers, defenders):
         return min(material_swings)
 
 def get_adjacent_squares(square):
+    """
+    Returns a list of squares adjacent to the given square.
+    """
     adjacent_squares = []
     rank = square // 8
     file = square % 8
@@ -511,6 +610,9 @@ def get_adjacent_squares(square):
     return adjacent_squares
 
 def is_file_open(board, file):
+    """
+    Checks if a file is open (no pawns of either color).
+    """
     for rank in range(8):
         square = rank * 8 + file
         if board.bitboards.get('P', 0) & (1 << square):
