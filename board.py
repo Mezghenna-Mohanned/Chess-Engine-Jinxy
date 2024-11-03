@@ -668,7 +668,7 @@ class Board:
                 print(f"MovePredictor suggests: {predicted_move_str} (Invalid Move)")
 
         print("MovePredictor did not suggest a valid move. Falling back to Minimax.")
-        best_move = find_best_move(self, max_depth=4, time_limit=5.0)
+        best_move = find_best_move(self, max_depth=9, time_limit=5.0)
         if best_move:
             print(f"Minimax selects: {best_move}")
             return best_move

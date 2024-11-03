@@ -7,6 +7,7 @@ from utils import algebraic_to_square
 import random
 from minimax import find_best_move
 from predict_move import MovePredictor
+from rl_agent import RLAgent
 
 pygame.init()
 
@@ -85,6 +86,8 @@ class GUI:
         self.promotion_move = None
         self.promotion_pieces = ['Q', 'R', 'B', 'N']
         self.promotion_rects = []
+        self.ai_vs_ai = False
+        self.rl_agent = RLAgent()
 
     def draw_board(self):
         for row in range(ROWS):
@@ -159,7 +162,8 @@ class GUI:
                                     print(f"Promotion chosen: {promoted_piece}")
                                     self.promotion_move = None
                                     break
-                        elif self.board.white_to_move:
+                        elif not self.ai_vs_ai and self.board.white_to_move:
+                            # User input handling remains the same
                             square = self.get_square_clicked(pos)
 
                             if square is not None:
@@ -202,15 +206,31 @@ class GUI:
                                             print(f"Changed selection to square: {square_to_algebraic(square)} with piece {piece}")
                                         else:
                                             print(f"Clicked on invalid square: {square_to_algebraic(square)}")
+                        else:
+                            # In AI vs AI mode, no user input is needed
+                            pass
 
-                if self.promotion_move:
-                    self.draw_board()
-                    self.draw_pieces()
-                    self.draw_promotion_choices()
-                    pygame.display.flip()
-                    continue
+                # AI vs AI mode
+                if self.ai_vs_ai and self.running:
+                    if not self.board.is_game_over():
+                        legal_moves = self.board.generate_legal_moves()
+                        if legal_moves:
+                            action = self.rl_agent.select_action(self.board, legal_moves)
+                            self.board.make_move(action)
+                            # Update display after each move
+                            self.draw_board()
+                            self.draw_pieces()
+                            pygame.display.flip()
+                            pygame.event.pump()  # Process event queue
+                            clock.tick(2)  # Adjust the speed as needed
+                        else:
+                            print("No legal moves available.")
+                    else:
+                        print("Game over.")
+                        self.running = False
 
-                if not self.board.white_to_move and self.running:
+                # If not AI vs AI mode and it's AI's turn
+                elif not self.board.white_to_move and not self.ai_vs_ai:
                     ai_move = engine.get_ai_move(self.board)
                     if ai_move:
                         print(f"AI suggests: {ai_move}")
@@ -221,7 +241,7 @@ class GUI:
                             print(f"AI moved: {move_obj}")
                         else:
                             print("AI selected an invalid move. Selecting a legal move using Minimax.")
-                            best_move = find_best_move(self.board, max_depth=4, time_limit=5.0)  # Increased depth for better analysis
+                            best_move = find_best_move(self.board, max_depth=9, time_limit=5.0)  # Increased depth for better analysis
                             if best_move:
                                 self.board.make_move(best_move)
                                 print(f"Minimax selects: {best_move}")
@@ -266,9 +286,9 @@ class GUI:
 
         if self.board.is_checkmate():
             if self.board.white_to_move:
-                message = "You lost!"
+                message = "Black wins!"
             else:
-                message = "You won!"
+                message = "White wins!"
         else:
             message = "Draw."
 
@@ -430,10 +450,20 @@ class ChessEngine:
             return None
 
 def main():
+    # Uncomment the following lines to train the RL agent and watch AI vs AI gameplay
+
     engine = ChessEngine()
     board = Board()
     gui = GUI(board)
+    gui.ai_vs_ai = True  #set to True for AI vs AI mode
     gui.main_loop(engine)
+
+    #for normal gameplay with human vs AI, keep the following lines
+
+    #engine = ChessEngine()
+    #board = Board()
+    #gui = GUI(board)
+    #gui.main_loop(engine)
 
 if __name__ == "__main__":
     main()
