@@ -452,18 +452,18 @@ class ChessEngine:
 def main():
     # Uncomment the following lines to train the RL agent and watch AI vs AI gameplay
 
-    engine = ChessEngine()
-    board = Board()
-    gui = GUI(board)
-    gui.ai_vs_ai = True  #set to True for AI vs AI mode
-    gui.main_loop(engine)
-
-    #for normal gameplay with human vs AI, keep the following lines
-
     #engine = ChessEngine()
     #board = Board()
     #gui = GUI(board)
+    #gui.ai_vs_ai = True  #set to True for AI vs AI mode
     #gui.main_loop(engine)
+
+    #for normal gameplay with human vs AI, keep the following lines
+
+    engine = ChessEngine()
+    board = Board()
+    gui = GUI(board)
+    gui.main_loop(engine)
 
 if __name__ == "__main__":
     main()

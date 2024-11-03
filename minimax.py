@@ -1,18 +1,14 @@
 from evaluation import evaluate
-from multiprocessing import Pool, cpu_count
 import time
-import sys
 
 TT_SIZE = 1000000
 transposition_table = {}
 
 def quiescence_search(board, alpha, beta, color):
-    original_white_to_move = board.white_to_move
-
+    """
+    Performs a quiescence search to evaluate positions with potential captures.
+    """
     stand_pat = color * evaluate(board)
-
-    board.white_to_move = original_white_to_move
-
     if stand_pat >= beta:
         return beta
     if alpha < stand_pat:
@@ -32,11 +28,15 @@ def quiescence_search(board, alpha, beta, color):
     return alpha
 
 def negamax(board, depth, alpha, beta, color, start_time, time_limit):
-    alpha_orig = alpha
+    """
+    Implements the Negamax algorithm with alpha-beta pruning and transposition tables.
+    """
     if time.time() - start_time > time_limit:
         raise TimeoutError("Search timed out")
 
     board_hash = board.zobrist_hash
+    alpha_orig = alpha
+
     tt_entry = transposition_table.get(board_hash)
     if tt_entry and tt_entry['depth'] >= depth:
         if tt_entry['flag'] == 'exact':
@@ -48,19 +48,19 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
         if alpha >= beta:
             return tt_entry['value']
 
-    if depth == 0 or board.is_game_over():
-        original_white_to_move = board.white_to_move
-        value = quiescence_search(board, alpha, beta, color)
-        board.white_to_move = original_white_to_move
-        return value
+    if depth == 0:
+        return quiescence_search(board, alpha, beta, color)
 
-    max_eval = float('-inf')
     moves = board.generate_legal_moves()
     if not moves:
-        return color * evaluate(board)
+        if board.is_in_check():
+            return -100000 + board.fullmove_number  # Checkmate
+        else:
+            return 0  # Stalemate
 
     moves = order_moves(moves)
 
+    max_eval = float('-inf')
     for move in moves:
         board.make_move(move)
         try:
@@ -82,7 +82,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
         flag = 'lowerbound'
 
     if len(transposition_table) > TT_SIZE:
-        transposition_table.pop(next(iter(transposition_table)))
+        transposition_table.clear()
     transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
 
     return max_eval
@@ -90,22 +90,14 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
 def find_best_move(board, max_depth, time_limit=5.0):
     """
     Finds the best move using iterative deepening and Negamax with alpha-beta pruning.
-    Args:
-        board (Board): Current board state.
-        max_depth (int): Maximum search depth.
-        time_limit (float): Time limit in seconds for the search.
-    Returns:
-        Move or None: The best move found within the time limit.
     """
     best_move = None
-    best_eval = float('-inf')
     color = 1 if board.white_to_move else -1
-    legal_moves = board.generate_legal_moves()
-    if not legal_moves:
+    moves = board.generate_legal_moves()
+    if not moves:
         return None
 
-    moves = order_moves(legal_moves)
-
+    moves = order_moves(moves)
     start_time = time.time()
 
     try:
@@ -124,26 +116,19 @@ def find_best_move(board, max_depth, time_limit=5.0):
                     current_best_eval = eval
                     current_best_move = move
             if current_best_move:
-                best_eval = current_best_eval
                 best_move = current_best_move
-            if abs(best_eval) > 10000:
+            if time.time() - start_time > time_limit:
                 break
-            if best_move:
-                moves = [best_move] + [m for m in moves if m != best_move]
+            moves = [best_move] + [m for m in moves if m != best_move]
     except TimeoutError:
-        print("Search timed out. Returning the best move found so far.")
-        return best_move
+        pass
 
     return best_move
 
 def order_moves(moves):
     """
     Orders moves to improve the efficiency of alpha-beta pruning.
-    Prioritizes captures, promotions, and checks.
-    Args:
-        moves (list of Move): List of possible moves.
-    Returns:
-        list of Move: Ordered list of moves.
+    Prioritizes captures, promotions, checks, and tactical motifs.
     """
     def move_ordering(move):
         score = 0
@@ -152,17 +137,20 @@ def order_moves(moves):
         if move.promoted_piece:
             score += 900
         if move.captured_piece:
-            piece_values = {
-                'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000,
-                'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
-            }
-            score += piece_values.get(move.captured_piece, 0)
+            captured_value = get_piece_value(move.captured_piece)
+            attacker_value = get_piece_value(move.piece)
+            score += 10 * (captured_value - attacker_value)
+        if move.is_check:
+            score += 50
         return score
 
     moves_sorted = sorted(moves, key=move_ordering, reverse=True)
     return moves_sorted
 
 def get_piece_value(piece):
+    """
+    Returns the value of a piece for move ordering.
+    """
     piece_values = {
         'P': 100, 'N': 320, 'B': 330, 'R': 500, 'Q': 900, 'K': 20000,
         'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000

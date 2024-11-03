@@ -313,33 +313,34 @@ class Board:
             moves.extend(self._generate_king_moves(piece, from_square, attacks_only))
         return moves
 
-    def generate_legal_moves(self):
+    def generate_legal_moves(self, simulate=True, own=True):
+        
         legal_moves = []
         all_moves = []
-        if self.white_to_move:
-            for piece in 'PNBRQK':
-                bitboard = self.bitboards.get(piece, 0)
-                while bitboard:
-                    from_square = (bitboard & -bitboard).bit_length() - 1
-                    moves = self.generate_piece_moves(piece, from_square)
-                    all_moves.extend(moves)
-                    bitboard &= bitboard - 1
+        if own:
+            pieces = 'PNBRQK' if self.white_to_move else 'pnbrqk'
         else:
-            for piece in 'pnbrqk':
-                bitboard = self.bitboards.get(piece, 0)
-                while bitboard:
-                    from_square = (bitboard & -bitboard).bit_length() - 1
-                    moves = self.generate_piece_moves(piece, from_square)
-                    all_moves.extend(moves)
-                    bitboard &= bitboard - 1
+            pieces = 'pnbrqk' if self.white_to_move else 'PNBRQK'
 
-        for move in all_moves:
-            self.make_move(move, change_turn=False)
-            if not self.is_in_check():
-                legal_moves.append(move)
-            self.undo_move(move)
+        for piece in pieces:
+            bitboard = self.bitboards.get(piece, 0)
+            while bitboard:
+                from_square = (bitboard & -bitboard).bit_length() - 1
+                moves = self.generate_piece_moves(piece, from_square)
+                all_moves.extend(moves)
+                bitboard &= bitboard - 1
+
+        if simulate:
+            for move in all_moves:
+                self.make_move(move, change_turn=False)
+                if not self.is_in_check():
+                    legal_moves.append(move)
+                self.undo_move(move)
+        else:
+            legal_moves = all_moves
 
         return legal_moves
+
 
     def _generate_pawn_moves(self, piece, from_square, attacks_only=False):
         moves = []
@@ -697,6 +698,7 @@ class Move:
         self.promoted_piece = promoted_piece
         self.is_en_passant = is_en_passant
         self.is_castling = is_castling
+        self.is_check = False
 
     def __eq__(self, other):
         return (
