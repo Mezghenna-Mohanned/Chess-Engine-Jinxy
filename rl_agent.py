@@ -8,6 +8,7 @@ from minimax import order_moves
 from evaluation import evaluate
 import numpy as np
 from collections import deque
+import matplotlib.pyplot as plt
 
 class QNetwork(nn.Module):
     def __init__(self, input_size=832, hidden_sizes=[1024, 512], output_size=4672):
@@ -31,7 +32,7 @@ class RLAgent:
         self.update_target_network()
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
         self.criterion = nn.MSELoss()
-        self.gamma = gamma  # Discount factor
+        self.gamma = gamma
         self.epsilon = epsilon_start  # Initial exploration rate
         self.epsilon_min = epsilon_end
         self.epsilon_decay = epsilon_decay
@@ -42,6 +43,11 @@ class RLAgent:
         self.batch_size = 64
         self.learn_step_counter = 0
         self.target_update_frequency = 1000  # Update target network every 1000 steps
+
+        # Metrics for monitoring training progress
+        self.rewards_per_episode = []  # List to store total rewards per episode
+        self.losses_per_episode = []   # List to store average losses per episode
+        self.loss_list = []            # List to store losses during each episode
 
     def update_target_network(self):
         self.target_network.load_state_dict(self.q_network.state_dict())
@@ -137,6 +143,9 @@ class RLAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+        # Record the loss
+        self.loss_list.append(loss.item())
+
     def calculate_reward(self, board, action, done):
         """
         Calculates the reward for a given board state and action.
@@ -162,6 +171,7 @@ class RLAgent:
             board = Board()
             state = self.board_to_tensor(board)
             total_reward = 0
+            self.loss_list = []  # Reset loss list for the new episode
             done = False
 
             if gui:
@@ -198,7 +208,48 @@ class RLAgent:
 
                 state = next_state
 
-            print(f"Episode {episode+1}/{num_episodes}, Total Reward: {total_reward}")
+            # At the end of each episode, log the total reward and average loss
+            avg_loss = np.mean(self.loss_list) if self.loss_list else 0
+            self.rewards_per_episode.append(total_reward)
+            self.losses_per_episode.append(avg_loss)
+
+            # Display final statistics for the episode
+            print(f"Episode {episode+1}/{num_episodes}")
+            print(f"Total Reward: {total_reward}")
+            print(f"Average Loss: {avg_loss:.4f}")
+            print(f"Epsilon: {self.epsilon:.4f}")
+
+            # Optionally, plot the progress after each episode (adjust frequency as needed)
+            if (episode + 1) % 10 == 0:
+                self.plot_progress()
+
+        # After training, plot the overall training progress
+        self.plot_progress(final=True)
+
+    def plot_progress(self, final=False):
+        episodes = range(1, len(self.rewards_per_episode) + 1)
+        plt.figure(figsize=(12, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.plot(episodes, self.rewards_per_episode, label='Total Reward per Episode')
+        plt.xlabel('Episode')
+        plt.ylabel('Total Reward')
+        plt.title('Total Rewards Over Episodes')
+        plt.legend()
+
+        plt.subplot(1, 2, 2)
+        plt.plot(episodes, self.losses_per_episode, label='Average Loss per Episode', color='orange')
+        plt.xlabel('Episode')
+        plt.ylabel('Average Loss')
+        plt.title('Average Loss Over Episodes')
+        plt.legend()
+
+        plt.tight_layout()
+        if final:
+            plt.show()
+        else:
+            plt.pause(0.001)
+            plt.clf()  # Clear the figure for the next update
 
     def save_model(self, path='models/rl_agent.pth'):
         torch.save(self.q_network.state_dict(), path)
