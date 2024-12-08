@@ -1,4 +1,4 @@
-# Chess AI Project
+# Chess AI Project  ( Projet est en pause ) 
 
 <div align="center">
   <img src="images/logo.png" alt="Chess AI Logo" width="200"/>
