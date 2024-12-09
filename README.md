@@ -172,5 +172,5 @@ Before diving into the installation, ensure that your system meets the following
 Start by cloning the repository to your local machine using Git.
 
 ```bash
-git clone https://github.com/yourusername/ChessAI.git
+git clone https://github.com/Mohanned29/ChessAI.git
 cd ChessAI
