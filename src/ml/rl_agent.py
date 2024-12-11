@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
-from board import Board
-from minimax import order_moves
-from evaluation import evaluate
+from src.core.board import Board
+from src.Ai.minimax import order_moves
+from src.Ai.evaluation import evaluate
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
@@ -258,3 +258,4 @@ class RLAgent:
         self.q_network.load_state_dict(torch.load(path, map_location=self.device))
         self.q_network.to(self.device)
         self.update_target_network()
+

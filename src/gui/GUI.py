@@ -2,12 +2,12 @@ import json
 import pygame
 import sys
 import os
-from board import Board, Move, square_to_algebraic
-from utils import algebraic_to_square
+from src.core.board import Board, Move, square_to_algebraic
+from src.utils.utils import algebraic_to_square
 import random
-from minimax import find_best_move
-from predict_move import MovePredictor
-from rl_agent import RLAgent
+from src.Ai.minimax import find_best_move
+from src.ml.predict_move import MovePredictor
+from src.ml.rl_agent import RLAgent
 
 pygame.init()
 
@@ -452,18 +452,18 @@ class ChessEngine:
 def main():
     # Uncomment the following lines to train the RL agent and watch AI vs AI gameplay
 
-    #engine = ChessEngine()
-    #board = Board()
-    #gui = GUI(board)
-    #gui.ai_vs_ai = True  #set to True for AI vs AI mode
-    #gui.main_loop(engine)
-
-    #for normal gameplay with human vs AI, keep the following lines
-
     engine = ChessEngine()
     board = Board()
     gui = GUI(board)
+    gui.ai_vs_ai = True  #set to True for AI vs AI mode
     gui.main_loop(engine)
+
+    #for normal gameplay with human vs AI, keep the following lines
+
+    #engine = ChessEngine()
+    #board = Board()
+    #gui = GUI(board)
+    #gui.main_loop(engine)
 
 if __name__ == "__main__":
     main()

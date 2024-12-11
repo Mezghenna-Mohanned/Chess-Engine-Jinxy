@@ -1,5 +1,5 @@
-from move_generation import Move, generate_legal_moves
-from utils import algebraic_to_square
+from src.core.move_generation import Move, generate_legal_moves
+from src.utils.utils import algebraic_to_square
 
 def get_user_move(board, user_input):
     if len(user_input) != 4:

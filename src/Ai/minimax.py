@@ -1,4 +1,4 @@
-from evaluation import evaluate
+from src.Ai.evaluation import evaluate
 import time
 
 TT_SIZE = 1000000

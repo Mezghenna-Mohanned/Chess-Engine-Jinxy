@@ -1,6 +1,6 @@
 import numpy as np
 from functools import lru_cache
-from constants import PIECE_VALUES, POSITIONAL_VALUES, FILE_MASKS
+from src.core.constants import PIECE_VALUES, POSITIONAL_VALUES, FILE_MASKS
 
 
 PIECE_SQUARE_TABLES = {

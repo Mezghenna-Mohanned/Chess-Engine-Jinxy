@@ -4,8 +4,8 @@ import torch
 import numpy as np
 import json
 import chess
-from utils import algebraic_to_square, square_to_algebraic
-from train_model import ChessMovePredictor
+from src.utils.utils import algebraic_to_square, square_to_algebraic
+from src.ml.train_model import ChessMovePredictor
 
 class MovePredictor:
     def __init__(self, model_path='models/best_move_model.pth', labels_path='models/labels_mapping.json'):

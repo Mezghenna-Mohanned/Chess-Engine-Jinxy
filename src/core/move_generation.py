@@ -1,6 +1,6 @@
-from constants import KNIGHT_MOVES, KING_MOVES , FILE_A , FILE_H
+from src.core.constants import KNIGHT_MOVES, KING_MOVES , FILE_A , FILE_H
 from collections import namedtuple
-from board import Move
+from src.core.board import Move
 
 Move = namedtuple('Move', ['piece', 'from_square', 'to_square', 'promotion'])
 

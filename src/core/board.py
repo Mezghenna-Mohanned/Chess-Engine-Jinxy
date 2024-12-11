@@ -1,10 +1,10 @@
-from constants import INITIAL_POSITIONS, FILE_MASKS
+from src.core.constants import INITIAL_POSITIONS, FILE_MASKS
 import random
 import json
-from utils import algebraic_to_square, square_to_algebraic
-from predict_move import MovePredictor
-from minimax import find_best_move
-from evaluation import evaluate
+from src.utils.utils import algebraic_to_square, square_to_algebraic
+from src.ml.predict_move import MovePredictor
+from src.Ai.minimax import find_best_move
+from src.Ai.evaluation import evaluate
 
 class Board:
     def __init__(self):
