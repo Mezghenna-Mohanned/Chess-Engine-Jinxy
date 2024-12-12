@@ -14,8 +14,7 @@ def play_game():
     model = ChessNet(device='cpu')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    # Load the latest checkpoint
-    checkpoint_path = 'checkpoint_50.pth'  # Change this to your latest checkpoint filename
+    checkpoint_path = 'checkpoint_50.pth'
     load_checkpoint(model, optimizer, checkpoint_path)
 
     engine = ChessEngine(model, device='cpu')
@@ -26,6 +25,7 @@ def play_game():
         if board.turn == chess.BLACK:
             move = engine.get_best_move(board)
             print(f"Engine plays: {move}")
+            board.push(move)
         else:
             user_input = input("Enter your move (e.g., e2e4): ")
             move = chess.Move.from_uci(user_input)

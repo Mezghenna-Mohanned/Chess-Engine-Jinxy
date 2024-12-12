@@ -16,28 +16,24 @@ class ChessEngine:
 
         with torch.no_grad():
             policy, value = self.model(state)
-            
-        # Get move probabilities
+
         policy = policy.exp().cpu().numpy()[0]
-        
-        # Filter legal moves
+
         legal_moves = list(board.legal_moves)
         legal_move_probs = np.zeros(len(legal_moves))
-        
+
         for i, move in enumerate(legal_moves):
             idx = self.encoder.move_to_index(move)
             if idx < len(policy):
                 legal_move_probs[i] = policy[idx]
-        
-        # Apply temperature
+
         if temperature != 1.0:
-            legal_move_probs = np.power(legal_move_probs, 1/temperature)
-        
-        # Normalize probabilities
-        legal_move_probs = legal_move_probs / np.sum(legal_move_probs)
-        
-        # Select move
+            legal_move_probs = np.power(legal_move_probs, 1 / temperature)
+
+        legal_move_probs /= np.sum(legal_move_probs)
+
         selected_move = np.random.choice(legal_moves, p=legal_move_probs)
+        
         return selected_move
 
 
@@ -67,7 +63,7 @@ class ChessEngine:
                 state = self.encoder.encode_board(board)
                 move = self.get_best_move(board, temperature=1.0)
                 
-                policy = np.zeros(4672)  # Total possible moves
+                policy = np.zeros(4672)  #total possible moves
                 policy[self.encoder.move_to_index(move)] = 1
                 
                 states.append(state)
