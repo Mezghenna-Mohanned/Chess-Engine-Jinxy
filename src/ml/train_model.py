@@ -1,3 +1,5 @@
+# train_model.py
+
 import os
 import chess.pgn
 import torch
@@ -14,7 +16,7 @@ LABELS_SAVE_PATH = 'models/labels_mapping.json'
 BATCH_SIZE = 64
 EPOCHS = 10
 LEARNING_RATE = 0.001
-INPUT_SIZE = 832  # 8x8x13
+INPUT_SIZE = 832
 HIDDEN_SIZES = [1024, 512, 256]
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -55,9 +57,6 @@ class ChessDataset(Dataset):
                         board.push(move)
     
     def fen_to_features(self, fen):
-        """
-        Converts a FEN string to a numerical feature array, including active color.
-        """
         board = chess.Board(fen)
         feature = np.zeros((8, 8, 13), dtype=np.float32)
         for square, piece in board.piece_map().items():
@@ -118,15 +117,18 @@ def main():
     with open(LABELS_SAVE_PATH, 'w') as f:
         json.dump({'move_to_int': move_to_int, 'int_to_move': int_to_move}, f)
     print(f"Saved move mappings to {LABELS_SAVE_PATH}")
+    
     print("Loading dataset...")
     dataset = ChessDataset(DATA_DIR, move_to_int, int_to_move)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
     print(f"Total samples: {len(dataset)}")
+    
     print("Initializing model...")
     model = ChessMovePredictor(input_size=INPUT_SIZE, hidden_sizes=HIDDEN_SIZES, output_size=len(move_to_int))
     model.to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    
     print("Starting training...")
     for epoch in range(EPOCHS):
         model.train()

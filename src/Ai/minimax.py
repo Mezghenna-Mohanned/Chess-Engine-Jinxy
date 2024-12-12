@@ -4,7 +4,7 @@ import time
 TT_SIZE = 1000000
 transposition_table = {}
 
-def quiescence_search(board, alpha, beta, color):
+def quiescence_search(board, alpha, beta, color, depth=0, max_depth=4):
     """
     Performs a quiescence search to evaluate positions with potential captures.
     """
@@ -14,12 +14,15 @@ def quiescence_search(board, alpha, beta, color):
     if alpha < stand_pat:
         alpha = stand_pat
 
+    if depth >= max_depth:
+        return stand_pat
+
     capture_moves = board.generate_capture_moves()
-    capture_moves = order_moves(capture_moves)
+    capture_moves = order_moves(board, capture_moves)
 
     for move in capture_moves:
         board.make_move(move)
-        score = -quiescence_search(board, -beta, -alpha, -color)
+        score = -quiescence_search(board, -beta, -alpha, -color, depth + 1, max_depth)
         board.undo_move(move)
         if score >= beta:
             return beta
@@ -58,9 +61,10 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
         else:
             return 0  # Stalemate
 
-    moves = order_moves(moves)
+    moves = order_moves(board, moves)
 
     max_eval = float('-inf')
+    best_move = None
     for move in moves:
         board.make_move(move)
         try:
@@ -71,6 +75,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
         board.undo_move(move)
         if eval > max_eval:
             max_eval = eval
+            best_move = move
         alpha = max(alpha, eval)
         if alpha >= beta:
             break
@@ -83,7 +88,7 @@ def negamax(board, depth, alpha, beta, color, start_time, time_limit):
 
     if len(transposition_table) > TT_SIZE:
         transposition_table.clear()
-    transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag}
+    transposition_table[board_hash] = {'value': max_eval, 'depth': depth, 'flag': flag, 'best_move': best_move}
 
     return max_eval
 
@@ -97,17 +102,19 @@ def find_best_move(board, max_depth, time_limit=5.0):
     if not moves:
         return None
 
-    moves = order_moves(moves)
+    moves = order_moves(board, moves)
     start_time = time.time()
 
     try:
         for depth in range(1, max_depth + 1):
             current_best_eval = float('-inf')
             current_best_move = None
+            alpha = float('-inf')
+            beta = float('inf')
             for move in moves:
                 board.make_move(move)
                 try:
-                    eval = -negamax(board, depth - 1, float('-inf'), float('inf'), -color, start_time, time_limit)
+                    eval = -negamax(board, depth - 1, -beta, -alpha, -color, start_time, time_limit)
                 except TimeoutError:
                     board.undo_move(move)
                     raise
@@ -115,6 +122,7 @@ def find_best_move(board, max_depth, time_limit=5.0):
                 if eval > current_best_eval:
                     current_best_eval = eval
                     current_best_move = move
+                alpha = max(alpha, eval)
             if current_best_move:
                 best_move = current_best_move
             if time.time() - start_time > time_limit:
@@ -125,27 +133,26 @@ def find_best_move(board, max_depth, time_limit=5.0):
 
     return best_move
 
-def order_moves(moves):
+def order_moves(board, moves):
     """
     Orders moves to improve the efficiency of alpha-beta pruning.
     Prioritizes captures, promotions, checks, and tactical motifs.
     """
     def move_ordering(move):
         score = 0
-        if move.is_castling:
-            score += 1000
-        if move.promoted_piece:
-            score += 900
-        if move.captured_piece:
+        if move.is_capture:
             captured_value = get_piece_value(move.captured_piece)
             attacker_value = get_piece_value(move.piece)
             score += 10 * (captured_value - attacker_value)
-        if move.is_check:
+        if move.promotion:
+            score += 900
+        if board.is_check_move(move):
             score += 50
+        if move.is_castling:
+            score += 30
         return score
 
-    moves_sorted = sorted(moves, key=move_ordering, reverse=True)
-    return moves_sorted
+    return sorted(moves, key=move_ordering, reverse=True)
 
 def get_piece_value(piece):
     """

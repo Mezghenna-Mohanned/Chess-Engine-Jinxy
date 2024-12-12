@@ -24,11 +24,8 @@ class MovePredictor:
         self.model.eval()
 
     def fen_to_features(self, fen):
-        """
-        Converts a FEN string to a numerical feature array, including active color.
-        """
         board = chess.Board(fen)
-        feature = np.zeros((8, 8, 13), dtype=np.float32)  # 12 for pieces + 1 for active color
+        feature = np.zeros((8, 8, 13), dtype=np.float32)
         piece_to_index = {
             'P': 0, 'N': 1, 'B': 2, 'R': 3, 'Q': 4, 'K': 5,
             'p': 6, 'n': 7, 'b': 8, 'r': 9, 'q': 10, 'k': 11
@@ -43,16 +40,6 @@ class MovePredictor:
         return feature.flatten()
 
     def predict_move(self, fen, legal_moves):
-        """
-        Predicts the best move given the current board state, ensuring it's legal.
-
-        Parameters:
-        - fen (str): FEN string of the current board state.
-        - legal_moves (list of Move objects): List of currently legal moves.
-
-        Returns:
-        - str or None: Predicted move in UCI format, or None if prediction fails.
-        """
         features = self.fen_to_features(fen)
         features = torch.tensor(features, dtype=torch.float32).unsqueeze(0).to(self.device)
 
@@ -62,7 +49,6 @@ class MovePredictor:
             top_move_idx = torch.argmax(probabilities, dim=1).item()
             predicted_move = self.int_to_move.get(top_move_idx, None)
 
-        # tvalidi if the predicted move is legal
         if predicted_move and self.is_move_legal(predicted_move, legal_moves):
             return predicted_move
         else:
@@ -73,3 +59,22 @@ class MovePredictor:
             if str(move) == move_str:
                 return True
         return False
+
+    def update_model(self, fen, move):
+        features = self.fen_to_features(fen)
+        features = torch.tensor(features, dtype=torch.float32).unsqueeze(0).to(self.device)
+        move_idx = self.move_to_int.get(str(move), None)
+        
+        if move_idx is not None:
+            target = torch.tensor([move_idx], dtype=torch.long).to(self.device)
+            self.model.train()
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+            criterion = torch.nn.CrossEntropyLoss()
+            
+            optimizer.zero_grad()
+            outputs = self.model(features)
+            loss = criterion(outputs, target)
+            loss.backward()
+            optimizer.step()
+            
+            self.model.eval()
