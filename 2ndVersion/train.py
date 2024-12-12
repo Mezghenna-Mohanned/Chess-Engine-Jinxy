@@ -1,43 +1,61 @@
+import torch
 from src.model.chess_model import ChessNet
 from src.model.training import ChessTrainer
 from src.engine.chess_engine import ChessEngine
-import torch
+import os
+
+def load_checkpoint(model, optimizer, checkpoint_path):
+    """Load model and optimizer state from a checkpoint."""
+    checkpoint = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    start_epoch = checkpoint['epoch']
+    return start_epoch
 
 def main():
-    # Set device
     device = 'cpu'
     print(f"Using device: {device}")
-    
-    # Initialize components with smaller network size
+
     model = ChessNet(device=device)
-    trainer = ChessTrainer(model, device=device, learning_rate=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    trainer = ChessTrainer(model, device=device)
     engine = ChessEngine(model, device=device)
-    
-    # Training configuration
-    batch_size = 32  # Smaller batch size for CPU
-    num_epochs = 10
-    games_per_iteration = 50  # Reduced number of self-play games
-    
-    # Training loop
-    for iteration in range(100):
+
+    checkpoint_path = 'checkpoint_latest.pth'
+    start_epoch = 0
+
+    if os.path.exists(checkpoint_path):
+        print(f"Loading checkpoint from {checkpoint_path}")
+        start_epoch = load_checkpoint(model, optimizer, checkpoint_path)
+
+    batch_size = 32
+    num_iterations = 100
+    games_per_iteration = 50
+    save_interval = 10
+
+    for iteration in range(start_epoch, num_iterations + start_epoch):
         print(f"Starting iteration {iteration}")
-        
-        # Generate games through self-play
+
         games_data = engine.self_play(num_games=games_per_iteration)
-        
-        # Train on new games
-        for epoch in range(num_epochs):
-            total_loss = trainer.train_step(
-                games_data['states'],
-                games_data['policies'],
-                games_data['values'],
-                batch_size=batch_size
-            )
-            print(f"Epoch {epoch}, Loss: {total_loss:.4f}")
-            
-        # Save model periodically
-        if iteration % 10 == 0:
-            torch.save(model.state_dict(), f'model_iter_{iteration}.pth')
+
+        states = []
+        policies = []
+        values = []
+        for game_states, game_policies, game_values in games_data:
+            states.extend(game_states)
+            policies.extend(game_policies)
+            values.extend(game_values)
+
+        total_loss = trainer.train_step(states, policies, values, batch_size)
+        print(f"Iteration {iteration}, Loss: {total_loss:.4f}")
+
+        if iteration % save_interval == 0:
+            torch.save({
+                'epoch': iteration,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': total_loss,
+            }, f'checkpoint_{iteration}.pth')
 
 if __name__ == "__main__":
     main()
