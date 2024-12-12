@@ -417,53 +417,52 @@ class GUI:
 class ChessEngine:
     def __init__(self):
         self.move_predictor = MovePredictor()
+        self.games_played = 0
+        self.moves_learned = 0
+
+    def learn_from_user_move(self, board, move):
+        self.moves_learned += 1
+        print(f"Learning from user move: {move}")
+        self.move_predictor.update_model(board.to_fen(), move)
+        print(f"Total moves learned: {self.moves_learned}")
+
 
     def get_ai_move(self, board: Board):
-        """
-        Determines the AI's move by first attempting the MovePredictor.
-        If the suggested move is invalid or suboptimal, falls back to Minimax.
-        """
-        if not board.white_to_move:
-            move = board.suggest_move()
-            if move and move in board.generate_legal_moves():
-                print(f"MovePredictor suggests: {move}")
-                return str(move)
-            else:
-                print("MovePredictor suggested an invalid move, falling back to Minimax.")
-                best_move = find_best_move(board, max_depth=6, time_limit=5.0)  # increased depth for better analysis
-                if best_move:
-                    if best_move.is_castling:
-                        if best_move.to_square in [6, 62]:
-                            move_str = 'O-O'
-                        else:
-                            move_str = 'O-O-O'
-                    else:
-                        move_str = square_to_algebraic(best_move.from_square) + square_to_algebraic(best_move.to_square)
-                        if best_move.promoted_piece:
-                            move_str += f"{best_move.promoted_piece}"
-                    print(f"Minimax selects: {move_str}")
-                    return move_str
-                else:
-                    print("Minimax found no legal moves.")
-                    return None
+        self.games_played += 1
+        print(f"\nAI thinking (Game {self.games_played})...")
+        
+        move = board.suggest_move()
+        if move and move in board.generate_legal_moves():
+            print(f"MovePredictor suggests: {move}")
+            print(f"Confidence: {self.move_predictor.get_move_confidence(board.to_fen(), move):.2f}")
+            return str(move)
         else:
-            return None
+            print("MovePredictor suggested an invalid move, falling back to Minimax.")
+            best_move = find_best_move(board, max_depth=6, time_limit=5.0)
+            if best_move:
+                move_str = self.format_move(best_move)
+                print(f"Minimax selects: {move_str}")
+                return move_str
+            else:
+                print("Minimax found no legal moves.")
+                return None
+
 
 def main():
     # Uncomment the following lines to train the RL agent and watch AI vs AI gameplay
 
-    engine = ChessEngine()
-    board = Board()
-    gui = GUI(board)
-    gui.ai_vs_ai = True  #set to True for AI vs AI mode
-    gui.main_loop(engine)
-
-    #for normal gameplay with human vs AI, keep the following lines
-
     #engine = ChessEngine()
     #board = Board()
     #gui = GUI(board)
+    #gui.ai_vs_ai = True  #set to True for AI vs AI mode
     #gui.main_loop(engine)
+
+    #for normal gameplay with human vs AI, keep the following lines
+
+    engine = ChessEngine()
+    board = Board()
+    gui = GUI(board)
+    gui.main_loop(engine)
 
 if __name__ == "__main__":
     main()
