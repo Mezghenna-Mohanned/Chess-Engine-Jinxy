@@ -8,7 +8,7 @@ class ChessNet(nn.Module):
         self.device = device
         
         # Input: 12 planes of 8x8
-        self.conv1 = nn.Conv2d(12, 128, 3, padding=1)  # Reduced from 256
+        self.conv1 = nn.Conv2d(12, 128, 3, padding=1)
         self.conv2 = nn.Conv2d(128, 128, 3, padding=1)
         self.conv3 = nn.Conv2d(128, 128, 3, padding=1)
         
@@ -16,11 +16,12 @@ class ChessNet(nn.Module):
         self.bn2 = nn.BatchNorm2d(128)
         self.bn3 = nn.BatchNorm2d(128)
         
-        # Policy head - reduced size
-        self.policy_conv = nn.Conv2d(128, 32, 1)
-        self.policy_bn = nn.BatchNorm2d(32)
+        # Policy head - output size should match total possible moves (64*64=4096)
+        self.policy_conv = nn.Conv2d(128, 64, 1)
+        self.policy_bn = nn.BatchNorm2d(64)
+        self.policy_fc = nn.Linear(64 * 64, 4096)
         
-        # Value head - reduced size
+        # Value head
         self.value_conv = nn.Conv2d(128, 32, 1)
         self.value_bn = nn.BatchNorm2d(32)
         self.value_fc1 = nn.Linear(32 * 64, 128)
@@ -36,7 +37,8 @@ class ChessNet(nn.Module):
         
         # Policy head
         policy = F.relu(self.policy_bn(self.policy_conv(x)))
-        policy = policy.view(-1, 32 * 64)
+        policy = policy.view(-1, 64 * 64)
+        policy = self.policy_fc(policy)
         policy = F.log_softmax(policy, dim=1)
         
         # Value head
