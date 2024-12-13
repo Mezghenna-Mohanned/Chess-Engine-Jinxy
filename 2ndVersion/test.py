@@ -14,7 +14,7 @@ def play_game():
     model = ChessNet(device='cpu')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    checkpoint_path = 'checkpoint_50.pth'
+    checkpoint_path = 'checkpoint_110.pth'
     load_checkpoint(model, optimizer, checkpoint_path)
 
     engine = ChessEngine(model, device='cpu')
