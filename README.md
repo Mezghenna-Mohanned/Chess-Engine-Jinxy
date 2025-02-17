@@ -1,8 +1,33 @@
-# Jinxy Chess AI Project
+# Jinxy Chess AI
 
 <div align="center">
-  <img src="1stVersion/images/logo.png" alt="Chess AI Logo" width="200"/>
+  <img src="1stVersion/images/logo.png" alt="Chess AI Logo" width="150"/>
+  <h3>A powerful neural network chess engine with advanced AI capabilities.</h3>
+  <p><a href="#">Explore Jinxy Chess AI Docs »</a></p>
+
+  <p>
+    <a href="#">Report bug</a> ·
+    <a href="#">Open a discussion</a> ·
+    <a href="#">Discord</a> ·
+    <a href="#">Blog</a>
+  </p>
+
+  <p>
+    <img src="https://img.shields.io/badge/Jinxy%20AI-Passing-brightgreen" alt="Build Status"/>
+    <img src="https://img.shields.io/badge/License-MIT-green" alt="License"/>
+    <img src="https://img.shields.io/badge/Official%20Release-v1.0-blue" alt="Official Release"/>
+    <img src="https://img.shields.io/badge/Commits-80%2B-blue" alt="Commits"/>
+  </p>
+
+  <p>
+    <img src="https://img.shields.io/badge/Website-Offline-red" alt="Website"/>
+    <img src="https://img.shields.io/badge/FishTest-Offline-red" alt="FishTest"/>
+    <img src="https://img.shields.io/badge/Discord-Join-blue" alt="Discord"/>
+    <img src="https://img.shields.io/badge/Stars-63-gold" alt="Users Online"/>
+  </p>
 </div>
+
+
 
 this repository is only to read code purposes , after cloning u wont be able to play cuz there are some functionalities that i removed for the purpose of more development
 
