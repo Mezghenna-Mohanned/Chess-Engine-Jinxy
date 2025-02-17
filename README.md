@@ -1,7 +1,7 @@
 # Jinxy Chess AI
 
 <div align="center">
-  <img src="1stVersion/images/logo.png" alt="Chess AI Logo" width="150"/>
+  <img src="1stVersion/images/logo.png" alt="Chess AI Logo" width="260" height="260" />
   <h3>A powerful neural network chess engine with advanced AI capabilities.</h3>
   <p><a href="#">Explore Jinxy Chess AI Docs »</a></p>
 
