@@ -28,12 +28,11 @@
 </div>
 
 
-
+## NOTE
 this repository is only to read code purposes , after cloning u wont be able to play cuz there are some functionalities that i removed for the purpose of more development
 
 
-
-
+## Overview
 Welcome to the **Jinxy Chess AI Project**! This project integrates a sophisticated machine learning-based artificial intelligence (AI) with a user-friendly graphical user interface (GUI) built using Pygame. The goal is to provide an engaging and challenging chess-playing experience where users can compete against an AI opponent capable of making intelligent and strategic moves based on a trained neural network model 
 
 ## Introduction
