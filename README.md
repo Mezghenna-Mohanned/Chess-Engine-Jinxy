@@ -23,7 +23,7 @@
     <img src="https://img.shields.io/badge/Website-Offline-red" alt="Website"/>
     <img src="https://img.shields.io/badge/FishTest-Offline-red" alt="FishTest"/>
     <img src="https://img.shields.io/badge/Discord-Join-blue" alt="Discord"/>
-    <img src="https://img.shields.io/badge/Stars-70-gold" alt="Users Online"/>
+    <img src="https://img.shields.io/badge/Stars-70%2B-gold" alt="Users Online"/>
   </p>
 </div>
 
